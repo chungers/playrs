@@ -1,0 +1,3 @@
+[submodule "hack/lib/github.com/rust-lang/rust-mode"]
+	path = hack/lib/github.com/rust-lang/rust-mode
+	url = git@github.com:rust-lang/rust-mode.git
