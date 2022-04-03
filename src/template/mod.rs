@@ -5,7 +5,7 @@ use tera::{Context, Tera};
 #[derive(clapArgs)]
 pub struct Args {
     /// Number of times to print
-    #[clap(long="times", short='n')]
+    #[clap(long="times", short='n', env="TEMPLATE_ITERATIONS", default_value="1")]
     iterations: u8,
 
     /// The Greeting message to use

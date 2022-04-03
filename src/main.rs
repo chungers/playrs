@@ -1,5 +1,5 @@
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, Args};
 
 mod serde;
 mod template;
@@ -21,7 +21,6 @@ struct Cli {
     verbose: bool,
 }
 
-
 #[derive(Subcommand)]
 enum Commands {
     /// Serde examples
@@ -30,32 +29,77 @@ enum Commands {
     /// Template examples
     Template(template::Args),
 
+    /// Stash - nested sub
+    Stash(Stash),
+
     /// Notify (watch files) examples
     Watch(watch::Args),
 }
+
+#[derive(Debug, Args)]
+#[clap(args_conflicts_with_subcommands = true)]
+struct Stash {
+    #[clap(subcommand)]
+    command: Option<StashCommands>,
+
+    #[clap(flatten)]
+    push: StashPush,
+}
+
+#[derive(Debug, Subcommand)]
+enum StashCommands {
+    Push(StashPush),
+    Pop { stash: Option<String> },
+    Apply { stash: Option<String> },
+}
+
+#[derive(Debug, Args)]
+struct StashPush {
+    #[clap(short, long)]
+    message: Option<String>,
+}
+
+
+
+
+
 
 
 fn main() {
     let cli = Cli::parse();
 
-    match &cli.command {
+    match cli.command {
         Commands::Serde(args) => {
             if cli.verbose {
                 println!("Serde...");
             }
-            serde::serde(args);
+            serde::serde(&args);
         },
         Commands::Template(args) => {
             if cli.verbose {
                 println!("Templating...");
             }
-            template::template(args);
+            template::template(&args);
         },
         Commands::Watch(args) => {
             if cli.verbose {
                 println!("Watching...");
             }
-            watch::watch(args);
+            watch::watch(&args);
+        },
+        Commands::Stash(stash) => {
+            let stash_cmd = stash.command.unwrap_or(StashCommands::Push(stash.push));
+            match stash_cmd {
+                StashCommands::Push(push) => {
+                    println!("Pushing {:?}", push);
+                }
+                StashCommands::Pop { stash } => {
+                    println!("Popping {:?}", stash);
+                }
+                StashCommands::Apply { stash } => {
+                    println!("Applying {:?}", stash);
+                }
+            }
         },
     }
 }
