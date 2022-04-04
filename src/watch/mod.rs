@@ -1,42 +1,60 @@
 
-use clap::{Args as clapArgs};
 use futures::{
     channel::mpsc::{channel, Receiver},
     SinkExt, StreamExt,
 };
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
-use std::path::Path;
-use std::fmt;
+use signal_hook::{
+    consts::SIGINT,
+    consts::SIGTERM,
+    iterator::Signals,
+};
+use std::{path::Path, process, thread};
 
 
-#[derive(clapArgs)]
-pub struct Args {
+pub mod command;
+use command::Verb::{Run, Stop};
 
-    /// The filesystem path to watch
-    path: Option<String>,
 
-    /// True to watch recursively from given path
-    #[clap(short)]
-    recursive: bool,
-}
+pub fn watch(cmd: &command::Command) {
+    println!("watch was used with arg: {:?}", cmd);
 
-impl fmt::Debug for Args {
-fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f.debug_struct("Arg")
-        .field("path", &self.path)
-        .field("recursive", &self.recursive)
-        .finish()
+    match cmd.verb.as_ref().unwrap() {
+        Run(args) => {
+            println!("Runing {:?}", args);
+
+
+            let mut signals = match Signals::new(&[SIGINT, SIGTERM]) {
+                Err(err) => {
+                    println!("Error {:?}", err);
+                    return;
+                },
+                Ok(s) => s,
+            };
+
+            thread::spawn(move || {
+                for sig in signals.forever() {
+                    println!("Received signal {:?}", sig);
+
+                    match sig {
+                        SIGINT => { println!("SIGINT"); process::exit(0x0100); },
+                        SIGTERM => { println!("SIGTERM"); process::exit(0x0100); },
+                        _ => println!("Others {:?}", sig),
+                    }
+                }
+            });
+
+
+            futures::executor::block_on(async {
+                if let Err(e) = async_watch(args.path.as_ref().unwrap()).await {
+                    println!("error: {:?}", e)
+                }
+            });
+        },
+        Stop(args) => {
+            println!("Stopping: {:?}", args);
+        },
     }
-}
-
-pub fn watch(args: &Args) {
-    println!("watch was used with arg: {:?}", args);
-
-    futures::executor::block_on(async {
-        if let Err(e) = async_watch(args.path.as_ref().unwrap()).await {
-            println!("error: {:?}", e)
-        }
-    });
 }
 
 

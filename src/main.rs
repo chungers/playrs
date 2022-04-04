@@ -33,7 +33,7 @@ enum Commands {
     Stash(Stash),
 
     /// Notify (watch files) examples
-    Watch(watch::Args),
+    Watch(watch::command::Command),
 }
 
 #[derive(Debug, Args)]
