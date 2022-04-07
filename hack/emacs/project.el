@@ -7,7 +7,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Basic colors, etc.
-(set-face-attribute 'default nil :height 150)  ; 150 for 15-point font
+(set-face-attribute 'default nil :height 140)  ; 140 for 14-point font
 (line-number-mode 1)
 (column-number-mode 1)
 (global-hl-line-mode 1) ;; highlights current line
@@ -195,6 +195,8 @@ it blindly to other people's files can cause enormously messy diffs!"
 (add-hook 'rust-mode-hook
           (lambda () (prettify-symbols-mode)))
 (define-key rust-mode-map (kbd "C-c C-c") 'rust-run)
+(setq rust-format-on-save t)
+
 
 
 ;; Compilation mode hook

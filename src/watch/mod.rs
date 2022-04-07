@@ -15,9 +15,13 @@ use std::{path::Path, process, thread};
 pub mod command;
 use command::Verb::{Run, Stop};
 
+mod server;
+
 
 pub fn watch(cmd: &command::Command) {
     println!("watch was used with arg: {:?}", cmd);
+
+    server::hello();
 
     match cmd.verb.as_ref().unwrap() {
         Run(args) => {

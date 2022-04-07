@@ -19,4 +19,8 @@ serde_json = { version = "1.0" }
 
 signal-hook = { version = "0.3" }
 
+tempfile = { version = "3" }
 tera = { version = "1" }
+tracing = { version = "0.1" }
+tracing-appender = { version = "0.1" }
+tracing-subscriber = { version = "0.3" }
