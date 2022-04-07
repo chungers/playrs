@@ -1,10 +1,14 @@
-
-use clap::{Parser, Subcommand, Args};
-
 mod serde;
 mod template;
 mod watch;
 
+use clap::{Args, Parser, Subcommand};
+
+use tracing::Level;
+use tracing::{debug, error, info, trace, warn};
+
+use std::io;
+use std::str::FromStr;
 
 #[derive(Parser)]
 #[clap(author = "chunger",
@@ -15,6 +19,10 @@ mod watch;
 struct Cli {
     #[clap(subcommand)]
     command: Commands,
+
+    /// Log level: trace, debug, info, warn, or error
+    #[clap(long, short)]
+    log_level: Option<String>,
 
     /// Prints out verbosely
     #[clap(long, short)]
@@ -59,47 +67,61 @@ struct StashPush {
     message: Option<String>,
 }
 
-
-
-
-
-
-
 fn main() {
     let cli = Cli::parse();
+
+    tracing_subscriber::fmt()
+        .with_max_level(match cli.log_level {
+            Some(s) => match Level::from_str(&s) {
+                Ok(l) => l,
+                Err(_) => Level::INFO,
+            },
+            None => Level::INFO,
+        })
+        .with_writer(io::stderr) // TODO - Support log rotation (see tracing-appender)
+        .with_target(false) // disable targets
+        .with_file(true) // display source code file paths
+        .with_line_number(true) // display source code line numbers
+        .init();
+
+    trace!("logging TRACE");
+    debug!("logging DEBUG");
+    info!("logging INFO");
+    warn!("logging WARN");
+    error!("logging ERROR");
 
     match cli.command {
         Commands::Serde(args) => {
             if cli.verbose {
-                println!("Serde...");
+                trace!("Serde...");
             }
             serde::serde(&args);
-        },
+        }
         Commands::Template(args) => {
             if cli.verbose {
-                println!("Templating...");
+                trace!("Templating...");
             }
             template::template(&args);
-        },
+        }
         Commands::Watch(args) => {
             if cli.verbose {
-                println!("Watching...");
+                trace!("Watching...");
             }
             watch::watch(&args);
-        },
+        }
         Commands::Stash(stash) => {
             let stash_cmd = stash.command.unwrap_or(StashCommands::Push(stash.push));
             match stash_cmd {
                 StashCommands::Push(push) => {
-                    println!("Pushing {:?}", push);
+                    trace!("Pushing {:?}", push);
                 }
                 StashCommands::Pop { stash } => {
-                    println!("Popping {:?}", stash);
+                    trace!("Popping {:?}", stash);
                 }
                 StashCommands::Apply { stash } => {
-                    println!("Applying {:?}", stash);
+                    trace!("Applying {:?}", stash);
                 }
             }
-        },
+        }
     }
 }

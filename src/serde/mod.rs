@@ -1,6 +1,6 @@
-
-use clap::{Args as clapArgs};
-use serde::{Serialize, Deserialize};
+use clap::Args as clapArgs;
+use serde::{Deserialize, Serialize};
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(clapArgs)]
 pub struct Args {
@@ -17,10 +17,7 @@ pub struct Args {
 
 impl Default for Point {
     fn default() -> Point {
-        Point {
-            x: 0,
-            y: 0,
-        }
+        Point { x: 0, y: 0 }
     }
 }
 
@@ -32,29 +29,29 @@ struct Point {
 
 //pub fn serde(name: &Option<String>) {
 pub fn serde(args: &Args) {
-    println!("serde was used with arg: {:?}", args.name);
+    trace!("serde was used with arg: {:?}", args.name);
 
-
-    let mut point = Point { ..Default::default() };
+    let mut point = Point {
+        ..Default::default()
+    };
     match args.x {
-        Some(v) => { point.x = v },
-        None => {},
+        Some(v) => point.x = v,
+        None => {}
     }
     match args.y {
-        Some(v) => { point.y = v },
-        None => {},
+        Some(v) => point.y = v,
+        None => {}
     }
-
 
     // Convert the Point to a JSON string.
     let serialized = serde_json::to_string(&point).unwrap();
 
     // Prints serialized = {"x":1,"y":2}
-    println!("serialized = {}", serialized);
+    info!("serialized = {}", serialized);
 
     // Convert the JSON string back to a Point.
     let deserialized: Point = serde_json::from_str(&serialized).unwrap();
 
     // Prints deserialized = Point { x: 1, y: 2 }
-    println!("deserialized JSON = {:?}", deserialized);
+    info!("deserialized JSON = {:?}", deserialized);
 }
