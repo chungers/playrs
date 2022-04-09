@@ -5,6 +5,7 @@
 *~
 .idea/
 *.iml
+.vscode/
 coverage.txt
 .tags
 # Vim temporary files.
