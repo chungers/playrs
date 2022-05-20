@@ -1,5 +1,7 @@
 use clap::Args as clapArgs;
 use serde::{Deserialize, Serialize};
+
+#[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
 #[derive(clapArgs)]

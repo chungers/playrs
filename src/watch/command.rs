@@ -1,7 +1,7 @@
+use clap::{Args as clapArgs, Subcommand};
 
-use clap::{Subcommand, Args as clapArgs};
-use std::fmt;
-
+#[allow(unused_imports)]
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(Debug, clapArgs)]
 #[clap(args_conflicts_with_subcommands = true)]
@@ -16,9 +16,8 @@ pub enum Verb {
     Stop(StopArgs),
 }
 
-#[derive(clapArgs)]
+#[derive(Debug, clapArgs)]
 pub struct RunArgs {
-
     /// The filesystem path to watch
     pub path: Option<String>,
 
@@ -27,27 +26,9 @@ pub struct RunArgs {
     pub recursive: bool,
 }
 
-#[derive(clapArgs)]
+#[derive(Debug, clapArgs)]
 pub struct StopArgs {
-
     /// True to kill
     #[clap(short)]
     pub kill: bool,
-}
-
-impl fmt::Debug for RunArgs {
-fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f.debug_struct("Run")
-        .field("path", &self.path)
-        .field("recursive", &self.recursive)
-        .finish()
-    }
-}
-
-impl fmt::Debug for StopArgs {
-fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f.debug_struct("Stop")
-        .field("kill", &self.kill)
-        .finish()
-    }
 }
