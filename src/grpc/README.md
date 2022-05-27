@@ -1,7 +1,7 @@
 GRPC
 ====
 
-To test using [evan])(https://github.com/ktr0731/evans#basic-usage) do
+To test using [evan](https://github.com/ktr0731/evans#basic-usage) do
 
 1. Start the server, from the project root:
 ```
