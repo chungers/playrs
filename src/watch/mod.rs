@@ -1,38 +1,30 @@
-
 use futures::{
     channel::mpsc::{channel, Receiver},
     SinkExt, StreamExt,
 };
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
-use signal_hook::{
-    consts::SIGINT,
-    consts::SIGTERM,
-    iterator::Signals,
-};
+use signal_hook::{consts::SIGINT, consts::SIGTERM, iterator::Signals};
 use std::{path::Path, process, thread};
-
 
 pub mod command;
 use command::Verb::{Run, Stop};
 
 mod server;
 
-
 pub fn watch(cmd: &command::Command) {
     println!("watch was used with arg: {:?}", cmd);
 
-    server::hello();
+    server::startup();
 
     match cmd.verb.as_ref().unwrap() {
         Run(args) => {
             println!("Runing {:?}", args);
 
-
             let mut signals = match Signals::new(&[SIGINT, SIGTERM]) {
                 Err(err) => {
                     println!("Error {:?}", err);
                     return;
-                },
+                }
                 Ok(s) => s,
             };
 
@@ -41,26 +33,30 @@ pub fn watch(cmd: &command::Command) {
                     println!("Received signal {:?}", sig);
 
                     match sig {
-                        SIGINT => { println!("SIGINT"); process::exit(0x0100); },
-                        SIGTERM => { println!("SIGTERM"); process::exit(0x0100); },
+                        SIGINT => {
+                            println!("SIGINT");
+                            process::exit(0x0100);
+                        }
+                        SIGTERM => {
+                            println!("SIGTERM");
+                            process::exit(0x0100);
+                        }
                         _ => println!("Others {:?}", sig),
                     }
                 }
             });
-
 
             futures::executor::block_on(async {
                 if let Err(e) = async_watch(args.path.as_ref().unwrap()).await {
                     println!("error: {:?}", e)
                 }
             });
-        },
+        }
         Stop(args) => {
             println!("Stopping: {:?}", args);
-        },
+        }
     }
 }
-
 
 fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
     let (mut tx, rx) = channel(1);

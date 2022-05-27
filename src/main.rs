@@ -1,3 +1,4 @@
+mod grpc;
 mod serde;
 mod template;
 mod watch;
@@ -5,6 +6,8 @@ mod watch;
 use clap::{Args, Parser, Subcommand};
 
 use tracing::Level;
+
+#[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
 use std::io;
@@ -20,7 +23,7 @@ struct Cli {
     #[clap(subcommand)]
     command: Commands,
 
-    /// Log level: trace, debug, info, warn, or error
+    /// Log levels: trace, debug, info, warn, or error
     #[clap(long, short)]
     log_level: Option<String>,
 
@@ -31,6 +34,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// gRPC examples
+    GRPC(grpc::command::Command),
+
     /// Serde examples
     Serde(serde::Args),
 
@@ -84,11 +90,7 @@ fn main() {
         .with_line_number(true) // display source code line numbers
         .init();
 
-    trace!("logging TRACE");
-    debug!("logging DEBUG");
-    info!("logging INFO");
-    warn!("logging WARN");
-    error!("logging ERROR");
+    trace!("starting");
 
     match cli.command {
         Commands::Serde(args) => {
@@ -108,6 +110,12 @@ fn main() {
                 trace!("Watching...");
             }
             watch::watch(&args);
+        }
+        Commands::GRPC(args) => {
+            if cli.verbose {
+                trace!("GRPC...");
+            }
+            grpc::command::go(&args);
         }
         Commands::Stash(stash) => {
             let stash_cmd = stash.command.unwrap_or(StashCommands::Push(stash.push));

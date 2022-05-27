@@ -1,4 +1,3 @@
-
-pub fn hello() {
+pub fn startup() {
     println!("server run");
 }
