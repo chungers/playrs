@@ -1,3 +1,5 @@
+#[path = "client.rs"]
+mod client;
 #[path = "server.rs"]
 mod server;
 
@@ -47,13 +49,17 @@ pub struct StopArgs {
 pub struct CallArgs {
     port: String,
     #[clap(short, long)]
-    message: String,
+    name: String,
 }
 
 pub fn start(args: &StartArgs) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Starting server {:?}", args.name);
-
+    debug!("Starting server {:?}", args.name);
     return server::start(&args.port);
+}
+
+pub fn call(args: &CallArgs) -> Result<(), Box<dyn std::error::Error>> {
+    debug!("Calling server {:?}", args);
+    return client::call(&args.port, &args.name);
 }
 
 pub fn go(cmd: &Command) {
@@ -62,13 +68,16 @@ pub fn go(cmd: &Command) {
     match cmd.verb.as_ref().unwrap() {
         Verb::Start(args) => {
             trace!("Called start: {:?}", args);
-            start(args);
+            let result = start(args);
+            trace!("Result: {:?}", result);
         }
         Verb::Stop(args) => {
             trace!("Called stop: {:?}", args);
         }
         Verb::Call(args) => {
             trace!("Called call: {:?}", args);
+            let result = call(args);
+            trace!("Result: {:?}", result);
         }
     }
 }

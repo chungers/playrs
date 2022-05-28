@@ -27,6 +27,7 @@ impl HelloService for MyServer {
         let response = HelloResponse {
             message: out.to_string(),
         };
+
         Ok(Response::new(response))
     }
 }
