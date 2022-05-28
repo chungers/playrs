@@ -12,12 +12,8 @@ use tonic::Request;
 
 #[tokio::main]
 pub async fn call(port: &String, name: &String) -> Result<(), Box<dyn std::error::Error>> {
-    let mut addr: String = "https://".to_owned();
-    addr.push_str(&port);
-
-    trace!("Connecting to {:?}", addr);
-
-    let endpoint = Endpoint::from_shared(addr.to_string())?;
+    let endpoint = Endpoint::from_shared(port.to_string())?;
+    trace!("Connecting to {:?}", endpoint);
 
     let mut client = HelloServiceClient::connect(endpoint).await?;
     let request = Request::new(HelloRequest {
