@@ -1,7 +1,7 @@
-#[path = "client.rs"]
-mod client;
-#[path = "server.rs"]
-mod server;
+//#[path = "client.rs"]
+use super::client;
+//#[path = "server.rs"]
+use super::server;
 
 use clap::{Args as clapArgs, Subcommand};
 
