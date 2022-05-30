@@ -32,5 +32,12 @@ tonic-reflection = "0.4.0"
 tokio = { version = "1.18", features = ["macros", "rt-multi-thread"] }
 prost = "0.10"
 
+# RocksDB
+rocksdb = "0.18.0"
+
+
+
 [build-dependencies]
+
+# For GRPC
 tonic-build = "0.7"

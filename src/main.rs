@@ -1,4 +1,5 @@
 mod grpc;
+mod rocksdb;
 mod serde;
 mod template;
 mod watch;
@@ -34,6 +35,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// RocksDB examples
+    Rocksdb(rocksdb::command::Command),
+
     /// gRPC examples
     GRPC(grpc::command::Command),
 
@@ -116,6 +120,12 @@ fn main() {
                 trace!("GRPC...");
             }
             grpc::command::go(&args);
+        }
+        Commands::Rocksdb(args) => {
+            if cli.verbose {
+                trace!("RocksDB...");
+            }
+            rocksdb::command::go(&args);
         }
         Commands::Stash(stash) => {
             let stash_cmd = stash.command.unwrap_or(StashCommands::Push(stash.push));
