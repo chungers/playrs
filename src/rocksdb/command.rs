@@ -11,7 +11,7 @@ use tracing::{debug, error, info, trace, warn};
 #[clap(args_conflicts_with_subcommands = true)]
 pub struct Command {
     #[clap(subcommand)]
-    pub verb: Option<Verb>,
+    pub verb: Verb,
 }
 
 #[derive(Debug, Subcommand)]
@@ -93,7 +93,7 @@ pub struct ListArgs {
 pub fn go(cmd: &Command) {
     trace!("Running command: {:?}", cmd);
 
-    match cmd.verb.as_ref().unwrap() {
+    match &cmd.verb {
         Verb::Start(args) => {
             trace!("Called start: {:?}", args);
         }
