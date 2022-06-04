@@ -3,6 +3,8 @@ use tracing::{debug, error, info, trace, warn};
 
 use rocksdb::{IteratorMode, DB};
 use simple_error::SimpleError;
+use std::error::Error;
+use std::fmt;
 use std::path::Path;
 
 fn open(path: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -12,9 +14,41 @@ fn open(path: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[derive(Debug)]
+struct ErrDbPathIsAFile {
+    path: String,
+}
+
+impl ErrDbPathIsAFile {
+    fn new(path: &str) -> ErrDbPathIsAFile {
+        ErrDbPathIsAFile {
+            path: path.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for ErrDbPathIsAFile {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "DbPath is a file: {}", self.path)
+    }
+}
+
+impl Error for ErrDbPathIsAFile {
+    fn description(&self) -> &str {
+        &self.path
+    }
+}
+
 pub fn init(path: &str) -> Result<(), Box<dyn std::error::Error>> {
     trace!("Init path={}", path);
-    if Path::new(path).exists() {
+    let p = Path::new(path);
+    if p.exists() {
+        // artificial case to return a custom error type
+        if p.is_file() {
+            error!("Path is a file: {}", path);
+            return Err(Box::new(ErrDbPathIsAFile::new(path)));
+        }
+
         error!("Path already exists: {}", path);
         return Err(Box::new(SimpleError::new(format!(
             "Path already exists: {}",
