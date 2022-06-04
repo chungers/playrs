@@ -90,24 +90,12 @@ pub struct ListArgs {
     prefix: String,
 }
 
-pub fn start(args: &StartArgs) -> Result<(), Box<dyn std::error::Error>> {
-    debug!("NOT IMPLEMENTED Starting server {:?}", args);
-    Ok(())
-}
-
-pub fn stop(args: &PutArgs) -> Result<(), Box<dyn std::error::Error>> {
-    debug!("NOT IMPLEMENTED Stopping server {:?}", args);
-    Ok(())
-}
-
 pub fn go(cmd: &Command) {
     trace!("Running command: {:?}", cmd);
 
     match cmd.verb.as_ref().unwrap() {
         Verb::Start(args) => {
             trace!("Called start: {:?}", args);
-            let result = start(args);
-            trace!("Result: {:?}", result);
         }
         Verb::Stop(args) => {
             trace!("Called stop: {:?}", args);
