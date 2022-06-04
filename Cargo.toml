@@ -25,6 +25,7 @@ tracing = { version = "0.1" }
 tracing-appender = { version = "0.1" }
 tracing-subscriber = { version = "0.3" }
 
+simple-error = { version = "0.2.3" }
 
 # gRPC dependencies
 tonic = "0.7"

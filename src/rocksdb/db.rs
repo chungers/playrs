@@ -1,13 +1,36 @@
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-use rocksdb::{Direction, IteratorMode, Options, DB};
+use rocksdb::{IteratorMode, DB};
+use simple_error::SimpleError;
+use std::path::Path;
 
 fn open(path: &str) -> Result<(), Box<dyn std::error::Error>> {
     trace!("Opening database at {}", path);
     let db = DB::open_default(path).unwrap();
     info!("DB = {:?}", db);
     Ok(())
+}
+
+pub fn init(path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    trace!("Init path={}", path);
+    if Path::new(path).exists() {
+        error!("Path already exists: {}", path);
+        return Err(Box::new(SimpleError::new(format!(
+            "Path already exists: {}",
+            path
+        ))));
+    }
+    match DB::open_default(path) {
+        Ok(_) => {
+            info!("Db init at path = {}", path);
+            Ok(())
+        }
+        Err(e) => {
+            error!("Error init db at path = {}, error = {}", path, e);
+            Err(Box::new(e))
+        }
+    }
 }
 
 pub fn put(path: &str, key: &str, value: &str) -> Result<(), Box<dyn std::error::Error>> {

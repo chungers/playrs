@@ -18,6 +18,7 @@ pub struct Command {
 pub enum Verb {
     Start(StartArgs),
     Stop(StopArgs),
+    Init(InitArgs),
     Put(PutArgs),
     Get(GetArgs),
     Delete(DeleteArgs),
@@ -45,6 +46,12 @@ pub struct StopArgs {
     /// Kills the process
     #[clap(short)]
     kill: bool,
+}
+
+#[derive(Debug, clapArgs)]
+pub struct InitArgs {
+    /// The DB path
+    path: String,
 }
 
 #[derive(Debug, clapArgs)]
@@ -104,6 +111,11 @@ pub fn go(cmd: &Command) {
         }
         Verb::Stop(args) => {
             trace!("Called stop: {:?}", args);
+        }
+        Verb::Init(args) => {
+            trace!("Called start: {:?}", args);
+            let result = db::init(&args.path);
+            trace!("Result: {:?}", result);
         }
         Verb::Put(args) => {
             trace!("Called put: {:?}", args);
