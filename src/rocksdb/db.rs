@@ -62,25 +62,29 @@ fn check_new_path(path: &str) -> Result<&Path, Box<dyn std::error::Error>> {
     Ok(p)
 }
 
-pub fn init(path: &str) -> Result<(), Box<dyn std::error::Error>> {
-    trace!("Init path={}", path);
-    let p = check_new_path(path)?;
+pub trait DbInfo {
+    fn path(&self) -> &str;
+}
+
+pub fn init(info: &dyn DbInfo) -> Result<(), Box<dyn std::error::Error>> {
+    trace!("Init path={}", info.path());
+    let p = check_new_path(info.path())?;
     match DB::open_default(p) {
         Ok(_) => {
-            info!("Db init at path = {}", path);
+            info!("Db init at path = {}", info.path());
             Ok(())
         }
         Err(e) => {
-            error!("Error init db at path = {}, error = {}", path, e);
+            error!("Error init db at path = {}, error = {}", info.path(), e);
             Err(Box::new(e))
         }
     }
 }
 
-pub fn put(path: &str, key: &str, value: &str) -> Result<(), Box<dyn std::error::Error>> {
-    trace!("Put path={}, key={}, value={}", path, key, value);
+pub fn put(info: &dyn DbInfo, key: &str, value: &str) -> Result<(), Box<dyn std::error::Error>> {
+    trace!("Put path={}, key={}, value={}", info.path(), key, value);
 
-    let db = DB::open_default(check_path(path)?)?; //.unwrap();
+    let db = DB::open_default(check_path(info.path())?)?;
     info!("DB = {:?}", db);
 
     match db.put(key.as_bytes(), value.as_bytes()) {
@@ -92,10 +96,10 @@ pub fn put(path: &str, key: &str, value: &str) -> Result<(), Box<dyn std::error:
     }
 }
 
-pub fn get(path: &str, key: &str) -> Result<Option<String>, Box<dyn std::error::Error>> {
-    trace!("Get path={}, key={}", path, key);
+pub fn get(info: &dyn DbInfo, key: &str) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    trace!("Get path={}, key={}", info.path(), key);
 
-    let db = DB::open_default(check_path(path)?)?; //.unwrap();
+    let db = DB::open_default(check_path(info.path())?)?;
     info!("DB = {:?}", db);
 
     match db.get(key.as_bytes()) {
@@ -115,9 +119,9 @@ pub fn get(path: &str, key: &str) -> Result<Option<String>, Box<dyn std::error::
     }
 }
 
-pub fn delete(path: &str, key: &str) -> Result<(), Box<dyn std::error::Error>> {
-    trace!("Put path={}, key={}", path, key);
-    let db = DB::open_default(check_path(path)?)?; //.unwrap();
+pub fn delete(info: &dyn DbInfo, key: &str) -> Result<(), Box<dyn std::error::Error>> {
+    trace!("Put path={}, key={}", info.path(), key);
+    let db = DB::open_default(check_path(info.path())?)?;
     info!("DB = {:?}", db);
     match db.delete(key.as_bytes()) {
         Ok(()) => Ok(()),
@@ -128,10 +132,9 @@ pub fn delete(path: &str, key: &str) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-pub fn list(path: &str, key: &str) -> Result<(), Box<dyn std::error::Error>> {
-    trace!("Put path={}, key={}", path, key);
-
-    let db = DB::open_default(check_path(path)?)?; //.unwrap();
+pub fn list(info: &dyn DbInfo, key: &str) -> Result<(), Box<dyn std::error::Error>> {
+    trace!("Put path={}, key={}", info.path(), key);
+    let db = DB::open_default(check_path(info.path())?)?;
     info!("DB = {:?}", db);
     let iter = db.iterator(IteratorMode::Start); // Always iterates forward
     for (k, v) in iter {
