@@ -4,7 +4,7 @@ mod serde;
 mod template;
 mod watch;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 
 use tracing::Level;
 
@@ -47,34 +47,8 @@ enum Commands {
     /// Template examples
     Template(template::Args),
 
-    /// Stash - nested sub
-    Stash(Stash),
-
     /// Notify (watch files) examples
     Watch(watch::command::Command),
-}
-
-#[derive(Debug, Args)]
-#[clap(args_conflicts_with_subcommands = true)]
-struct Stash {
-    #[clap(subcommand)]
-    command: Option<StashCommands>,
-
-    #[clap(flatten)]
-    push: StashPush,
-}
-
-#[derive(Debug, Subcommand)]
-enum StashCommands {
-    Push(StashPush),
-    Pop { stash: Option<String> },
-    Apply { stash: Option<String> },
-}
-
-#[derive(Debug, Args)]
-struct StashPush {
-    #[clap(short, long)]
-    message: Option<String>,
 }
 
 fn main() {
@@ -126,20 +100,6 @@ fn main() {
                 trace!("RocksDB...");
             }
             rocksdb::command::go(&args);
-        }
-        Commands::Stash(stash) => {
-            let stash_cmd = stash.command.unwrap_or(StashCommands::Push(stash.push));
-            match stash_cmd {
-                StashCommands::Push(push) => {
-                    trace!("Pushing {:?}", push);
-                }
-                StashCommands::Pop { stash } => {
-                    trace!("Popping {:?}", stash);
-                }
-                StashCommands::Apply { stash } => {
-                    trace!("Applying {:?}", stash);
-                }
-            }
         }
     }
 }
