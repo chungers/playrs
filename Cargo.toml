@@ -14,8 +14,12 @@ notify = "5.0.0-pre.14"
 arrow = { version = "5.0", default-features = false, features = ["csv", "ipc"] } # "simd" won't compile
 clap  = { version = "3.1.6", features = ["derive", "env"] }
 
-serde = { version = "1.0.136", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+
+# JSON
 serde_json = { version = "1.0" }
+# YAML
+serde_yaml = { version = "0.8" }
 
 signal-hook = { version = "0.3" }
 
@@ -35,8 +39,6 @@ prost = "0.10"
 
 # RocksDB
 rocksdb = "0.18.0"
-
-
 
 [build-dependencies]
 
