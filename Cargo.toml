@@ -6,41 +6,57 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-futures = "0.3.5"
-async-std = "1.5.0"
-crossbeam-channel = "0.4.0"
-notify = "5.0.0-pre.14"
+
+# Filesystem notifications ======
+futures = { version = "0.3.21" }
+async-std = { version = "1.12" }
+crossbeam-channel = { version = "0.5.5" }
+notify = { version = "5.0.0-pre.15" }
+# ====== Filesystem notifications
+
 
 arrow = { version = "5.0", default-features = false, features = ["csv", "ipc"] } # "simd" won't compile
-clap  = { version = "3.1.6", features = ["derive", "env"] }
 
-serde = { version = "1.0", features = ["derive"] }
 
+# CLI ============
+clap  = { version = "3.2.5", features = ["derive", "env"] }
+# ============ CLI
+
+# SERDE ==========
+serde = { version = "1.0.137", features = ["derive"] }
 # JSON
-serde_json = { version = "1.0" }
+serde_json = { version = "1.0.81" }
 # YAML
-serde_yaml = { version = "0.8" }
+serde_yaml = { version = "0.8.24" }
+# ========== SERDE
 
-signal-hook = { version = "0.3" }
 
+signal-hook = { version = "0.3.14" }
 tempfile = { version = "3" }
-tera = { version = "1" }
-tracing = { version = "0.1" }
-tracing-appender = { version = "0.1" }
-tracing-subscriber = { version = "0.3" }
 
+# Logging / Tracing ==========
+tera = { version = "1.16" }
+tracing = { version = "0.1.35" }
+tracing-appender = { version = "0.2.2" }
+tracing-subscriber = { version = "0.3.11" }
+# ========== Logging / Tracing
+
+# Error handling
 simple-error = { version = "0.2.3" }
 
-# gRPC dependencies
+# GRPC ========================
 tonic = "0.7"
-tonic-reflection = "0.4.0"
+tonic-reflection = "0.4"
 tokio = { version = "1.18", features = ["macros", "rt-multi-thread"] }
-prost = "0.10"
+prost = { version = "0.10" }
+# ======================== GRPC
 
-# RocksDB
-rocksdb = "0.18.0"
+# RocksDB =====================
+rocksdb = { version = "0.18" }
+# ===================== RocksDB
+
 
 [build-dependencies]
 
-# For GRPC
-tonic-build = "0.7"
+# GRPC
+tonic-build = { version = "0.7" }
