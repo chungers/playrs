@@ -53,7 +53,7 @@ fn check_new_path(path: &str) -> Result<&Path, Box<dyn std::error::Error>> {
             return Err(Box::new(ErrDbPathIsAFile::new(path)));
         }
 
-        error!("Path already exists: {}", path);
+        trace!("Path exists: {}", path);
         return Err(Box::new(SimpleError::new(format!(
             "Path already exists: {}",
             path
