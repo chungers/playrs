@@ -27,10 +27,6 @@ struct Cli {
     /// Log levels: trace, debug, info, warn, or error
     #[clap(long, short)]
     log_level: Option<String>,
-
-    /// Prints out verbosely
-    #[clap(long, short)]
-    verbose: bool,
 }
 
 #[derive(Subcommand)]
@@ -42,7 +38,7 @@ enum Commands {
     GRPC(grpc::command::Command),
 
     /// Serde examples
-    Serde(serde::Args),
+    Serde(serde::command::Command),
 
     /// Template examples
     Template(template::Args),
@@ -72,33 +68,18 @@ fn main() {
 
     match cli.command {
         Commands::Serde(args) => {
-            if cli.verbose {
-                trace!("Serde...");
-            }
-            serde::serde(&args);
+            serde::command::go(&args);
         }
         Commands::Template(args) => {
-            if cli.verbose {
-                trace!("Templating...");
-            }
             template::template(&args);
         }
         Commands::Watch(args) => {
-            if cli.verbose {
-                trace!("Watching...");
-            }
             watch::watch(&args);
         }
         Commands::GRPC(args) => {
-            if cli.verbose {
-                trace!("GRPC...");
-            }
             grpc::command::go(&args);
         }
         Commands::Rocksdb(args) => {
-            if cli.verbose {
-                trace!("RocksDB...");
-            }
             rocksdb::command::go(&args);
         }
     }

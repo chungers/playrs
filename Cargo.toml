@@ -14,9 +14,7 @@ crossbeam-channel = { version = "0.5.5" }
 notify = { version = "5.0.0-pre.15" }
 # ====== Filesystem notifications
 
-
 arrow = { version = "5.0", default-features = false, features = ["csv", "ipc"] } # "simd" won't compile
-
 
 # CLI ============
 clap  = { version = "3.2.5", features = ["derive", "env"] }
