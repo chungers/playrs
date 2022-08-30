@@ -29,10 +29,10 @@ pub struct EncodeArgs {
     encoding: Encoding,
 
     /// x coordinate for Point
-    x: i32,
+    x: f64,
 
     /// y coordinate for Point
-    y: i32,
+    y: f64,
 }
 
 #[derive(Debug, clapArgs)]

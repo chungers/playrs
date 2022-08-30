@@ -3,7 +3,7 @@ use crate::serde::Point;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-pub fn encode(x: i32, y: i32) {
+pub fn encode(x: f64, y: f64) {
     trace!("yaml encode: x={:?} y={:?}", x, y);
 
     let point = Point { x: x, y: y };
@@ -18,7 +18,7 @@ pub fn encode(x: i32, y: i32) {
 pub fn decode() {
     trace!("decode");
 
-    let point = Point { x: 100, y: 200 };
+    let point = Point { x: 100., y: 200. };
 
     // Convert the Point to a YAML string.
     let serialized = serde_yaml::to_string(&point).unwrap();
