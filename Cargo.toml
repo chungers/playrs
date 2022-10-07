@@ -14,7 +14,10 @@ crossbeam-channel = { version = "0.5.5" }
 notify = { version = "5.0.0-pre.15" }
 # ====== Filesystem notifications
 
-arrow = { version = "5.0", default-features = false, features = ["csv", "ipc"] } # "simd" won't compile
+# Apache Arrow ===
+# Used by Duckdb example also
+arrow = { version = "24.0" }
+# === Apache Arrow
 
 # CLI ============
 clap  = { version = "3.2.5", features = ["derive", "env"] }
@@ -49,9 +52,14 @@ tokio = { version = "1.18", features = ["macros", "rt-multi-thread"] }
 prost = { version = "0.10" }
 # ======================== GRPC
 
+# DuckDB =====================
+duckdb = { version = "0.4", features = ["bundled"] }
+# ===================== DuckDB
+
 # RocksDB =====================
 rocksdb = { version = "0.18" }
 # ===================== RocksDB
+
 
 
 [build-dependencies]

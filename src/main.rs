@@ -1,3 +1,4 @@
+mod duckdb;
 mod grpc;
 mod rocksdb;
 mod serde;
@@ -31,6 +32,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// DuckDB examples
+    Duckdb(duckdb::command::Command),
+
     /// RocksDB examples
     Rocksdb(rocksdb::command::Command),
 
@@ -81,6 +85,9 @@ fn main() {
         }
         Commands::Rocksdb(args) => {
             rocksdb::command::go(&args);
+        }
+        Commands::Duckdb(args) => {
+            duckdb::command::go(&args);
         }
     }
 }
