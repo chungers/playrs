@@ -7,6 +7,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Basic colors, etc.
+
 (set-face-attribute 'default nil :height 140)  ; 140 for 14-point font
 (line-number-mode 1)
 (column-number-mode 1)
@@ -23,6 +24,11 @@
                 )))
 ;;(setq default-frame-alist '((width . 140) (height . 10)))
 (when window-system (set-frame-size (selected-frame) 120 50))
+
+(require 'ansi-color)
+(defun colorize-compilation-buffer ()
+  (ansi-color-apply-on-region compilation-filter-start (point-max)))
+(add-hook 'compilation-filter-hook 'colorize-compilation-buffer)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Navigating windows:  Use option-<arrow_key>
