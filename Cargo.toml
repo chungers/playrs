@@ -11,12 +11,12 @@ edition = "2021"
 futures = { version = "0.3.21" }
 async-std = { version = "1.12" }
 crossbeam-channel = { version = "0.5.5" }
-notify = { version = "5.0.0-pre.15" }
+notify = { version = "5.1.0" }
 # ====== Filesystem notifications
 
 # Apache Arrow ===
 # Used by Duckdb example also
-arrow = { version = "24.0" }
+arrow = { version = "33.0.0" }
 # === Apache Arrow
 
 # CLI ============
@@ -53,7 +53,7 @@ prost = { version = "0.10" }
 # ======================== GRPC
 
 # DuckDB =====================
-duckdb = { version = "0.4", features = ["bundled"] }
+duckdb = { version = "0.6", features = ["bundled"] }
 # ===================== DuckDB
 
 # RocksDB =====================
