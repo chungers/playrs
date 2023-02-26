@@ -26,9 +26,16 @@
 (when window-system (set-frame-size (selected-frame) 120 50))
 
 (require 'ansi-color)
+
 (defun colorize-compilation-buffer ()
-  (ansi-color-apply-on-region compilation-filter-start (point-max)))
+  (toggle-read-only)
+  (ansi-color-apply-on-region compilation-filter-start (point))
+  (toggle-read-only))
 (add-hook 'compilation-filter-hook 'colorize-compilation-buffer)
+
+;; (defun colorize-compilation-buffer ()
+;;   (ansi-color-apply-on-region compilation-filter-start (point-max)))
+;; (add-hook 'compilation-filter-hook 'colorize-compilation-buffer)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Navigating windows:  Use option-<arrow_key>
