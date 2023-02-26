@@ -1,71 +1,22 @@
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-use duckdb::{params, Connection, Result};
+use duckdb::{params, Connection, Result, ToSql};
 
-use arrow::record_batch::RecordBatch;
-//use arrow::util::pretty::print_batches;
-
-use simple_error::SimpleError;
-use std::error::Error;
-use std::fmt;
-use std::path::Path;
+//use std::error::Error;
+//use std::fmt;
+use std::vec::Vec;
 
 use crate::duckdb::Person;
 
-#[derive(Debug)]
-struct ErrDbPathIsAFile {
-    path: String,
-}
-
-impl ErrDbPathIsAFile {
-    fn new(path: &str) -> ErrDbPathIsAFile {
-        ErrDbPathIsAFile {
-            path: path.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for ErrDbPathIsAFile {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "DbPath is a file: {}", self.path)
-    }
-}
-
-impl Error for ErrDbPathIsAFile {
-    fn description(&self) -> &str {
-        &self.path
-    }
-}
-
-pub fn example() -> Result<(), Box<dyn std::error::Error>> {
-    trace!("example");
-
-    let conn = Connection::open_in_memory()?;
-
-    conn.execute_batch(
-        r"CREATE SEQUENCE seq;
-          CREATE TABLE person (
-                  id              INTEGER PRIMARY KEY DEFAULT NEXTVAL('seq'),
-                  name            TEXT NOT NULL,
-                  data            BLOB
-                  );
-        ",
-    )?;
-
-    let me = Person {
-        id: 0,
-        name: "Steven".to_string(),
-        data: None,
-    };
-    conn.execute(
-        "INSERT INTO person (name, data) VALUES (?, ?)",
-        params![me.name, me.data],
-    )?;
-
-    // query table by rows
-    let mut stmt = conn.prepare("SELECT id, name, data FROM person")?;
-    let person_iter = stmt.query_map([], |row| {
+pub fn read_person<KT: ToSql>(
+    conn: &Connection,
+    whereq: &str,
+    val: &KT,
+) -> Result<Vec<Box<Person>>, Box<dyn std::error::Error>> {
+    let sql: String = "SELECT id, name, data FROM person WHERE ".to_string() + whereq;
+    let mut stmt = conn.prepare(&sql)?;
+    let person_iter = stmt.query_map([val], |row| {
         Ok(Person {
             id: row.get(0)?,
             name: row.get(1)?,
@@ -73,14 +24,67 @@ pub fn example() -> Result<(), Box<dyn std::error::Error>> {
         })
     })?;
 
+    let mut v: Vec<Box<Person>> = Vec::new();
     for person in person_iter {
-        println!("Found person {:?}", person.unwrap());
+        v.push(Box::new(person.unwrap()));
     }
 
-    /*
-        // query table by arrow
-        let rbs: Vec<RecordBatch> = stmt.query_arrow([])?.collect();
-        print_batches(&rbs);
-    */
-    Ok(())
+    trace!("got vec: {:?}", v);
+    Ok(v)
+}
+
+pub fn delete_person<KT: ToSql>(
+    conn: &Connection,
+    whereq: &str,
+    val: &KT,
+) -> Result<usize, Box<dyn std::error::Error>> {
+    let sql: String = "DELETE FROM person WHERE ".to_string() + whereq;
+    let mut stmt = conn.prepare(&sql)?;
+    match stmt.execute([val]) {
+        Ok(u) => {
+            trace!("ret={:?}", u);
+            Ok(u)
+        }
+        Err(e) => Err(Box::new(e)),
+    }
+}
+
+pub fn insert_person<'a>(
+    conn: &Connection,
+    person: &'a Person,
+) -> Result<&'a Person, Box<dyn std::error::Error>> {
+    trace!("inserting with conn={:?}, person={:?}", conn, person);
+
+    conn.execute(
+        r#"INSERT INTO person (name, data) VALUES (?, ?)"#,
+        params![person.name, person.data],
+    )?;
+
+    Ok(person)
+}
+
+pub fn update_person<'a>(
+    conn: &Connection,
+    person: &'a Person,
+) -> Result<&'a Person, Box<dyn std::error::Error>> {
+    trace!("updating with conn={:?}, person={:?}", conn, person);
+
+    conn.execute(
+        r#"UPDATE person SET name=? , data=? WHERE id=?"#,
+        params![person.name, person.data, person.id],
+    )?;
+
+    Ok(person)
+}
+
+pub fn initdb(conn: &Connection) -> Result<()> {
+    trace!("initdb with conn={:?}", conn);
+    conn.execute_batch(
+        r#"CREATE SEQUENCE IF NOT EXISTS seq;
+                  CREATE TABLE IF NOT EXISTS person (
+                      id              INTEGER PRIMARY KEY DEFAULT NEXTVAL('seq'),
+                      name            TEXT NOT NULL,
+                      data            BLOB
+                  );"#,
+    )
 }
