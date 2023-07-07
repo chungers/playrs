@@ -1,4 +1,5 @@
 mod duckdb;
+mod gcp;
 mod grpc;
 mod rocksdb;
 mod serde;
@@ -49,6 +50,9 @@ enum Commands {
 
     /// Notify (watch files) examples
     Watch(watch::command::Command),
+
+    /// GCP examples
+    GCP(gcp::command::Commands),
 }
 
 fn main() {
@@ -88,6 +92,9 @@ fn main() {
         }
         Commands::Duckdb(args) => {
             duckdb::command::go(&args);
+        }
+        Commands::GCP(args) => {
+            gcp::command::go(&args);
         }
     }
 }
