@@ -16,36 +16,11 @@ pub struct Command {
 
 #[derive(Debug, Subcommand)]
 pub enum Verb {
-    Start(StartArgs),
-    Stop(StopArgs),
     Init(InitArgs),
     Put(PutArgs),
     Get(GetArgs),
     Delete(DeleteArgs),
     List(ListArgs),
-}
-
-#[derive(Debug, clapArgs)]
-pub struct StartArgs {
-    /// Path to the db file
-    path: String,
-
-    /// The domain socket name
-    port: String,
-
-    /// Fork the process.  The command will return, and the server runs in background.
-    #[clap(short, long)]
-    fork: bool,
-}
-
-#[derive(Debug, clapArgs)]
-pub struct StopArgs {
-    /// The Port
-    port: String,
-
-    /// Kills the process
-    #[clap(short)]
-    kill: bool,
 }
 
 #[derive(Debug, clapArgs)]
@@ -124,12 +99,6 @@ pub fn go(cmd: &Command) {
     trace!("Running command: {:?}", cmd);
 
     match &cmd.verb {
-        Verb::Start(args) => {
-            trace!("Called start: {:?}", args);
-        }
-        Verb::Stop(args) => {
-            trace!("Called stop: {:?}", args);
-        }
         Verb::Init(args) => {
             trace!("Called start: {:?}", args);
             let result = db::init(args);
