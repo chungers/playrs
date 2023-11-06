@@ -137,7 +137,8 @@ pub fn list(info: &dyn DbInfo, key: &str) -> Result<(), Box<dyn std::error::Erro
     let db = DB::open_default(check_path(info.path())?)?;
     info!("DB = {:?}", db);
     let iter = db.iterator(IteratorMode::Start); // Always iterates forward
-    for (k, v) in iter {
+    for item in iter {
+        let (k, v) = item.unwrap();
         println!(
             "{} {}",
             String::from_utf8(k.to_vec()).unwrap(),
