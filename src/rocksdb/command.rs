@@ -16,29 +16,46 @@ pub struct Command {
 
 #[derive(Debug, Subcommand)]
 pub enum Verb {
-    Init(InitArgs),
+    Init(DbArgs),
     Put(PutArgs),
     Get(GetArgs),
     Delete(DeleteArgs),
     List(ListArgs),
 }
 
-#[derive(Debug, clapArgs)]
-pub struct InitArgs {
+#[derive(Debug, clapArgs, PartialEq, Eq)]
+pub struct DbArgs {
     /// The DB path
     path: String,
 }
 
-impl db::DbInfo for InitArgs {
+type Err = std::num::ParseIntError;
+impl DbArgs {
+    fn from_str(s: &str) -> Result<Self, Err> {
+        // TODO - Check path for valid rocksdb directory
+        Ok(DbArgs {
+            path: s.to_string(),
+        })
+    }
+}
+impl db::DbInfo for DbArgs {
     fn path(&self) -> &str {
         &self.path
+    }
+}
+
+// Required for claps
+impl std::str::FromStr for DbArgs {
+    type Err = std::num::ParseIntError; // TODO - replace with better error
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_str(s)
     }
 }
 
 #[derive(Debug, clapArgs)]
 pub struct PutArgs {
     /// The DB path
-    path: String,
+    db: DbArgs,
 
     /// The key
     key: String,
@@ -47,52 +64,29 @@ pub struct PutArgs {
     value: String,
 }
 
-impl db::DbInfo for PutArgs {
-    fn path(&self) -> &str {
-        &self.path
-    }
-}
-
 #[derive(Debug, clapArgs)]
 pub struct GetArgs {
     /// The DB path
-    path: String,
+    db: DbArgs,
+
     /// The key
     key: String,
-}
-
-impl db::DbInfo for GetArgs {
-    fn path(&self) -> &str {
-        &self.path
-    }
 }
 
 #[derive(Debug, clapArgs)]
 pub struct DeleteArgs {
     /// The DB path
-    path: String,
+    db: DbArgs,
     /// The key
     key: String,
-}
-
-impl db::DbInfo for DeleteArgs {
-    fn path(&self) -> &str {
-        &self.path
-    }
 }
 
 #[derive(Debug, clapArgs)]
 pub struct ListArgs {
     /// The DB path
-    path: String,
+    db: DbArgs,
     /// The key
     prefix: String,
-}
-
-impl db::DbInfo for ListArgs {
-    fn path(&self) -> &str {
-        &self.path
-    }
 }
 
 pub fn go(cmd: &Command) {
@@ -106,22 +100,22 @@ pub fn go(cmd: &Command) {
         }
         Verb::Put(args) => {
             trace!("Called put: {:?}", args);
-            let result = db::put(args, &args.key, &args.value);
+            let result = db::put(&args.db, &args.key, &args.value);
             trace!("Result: {:?}", result);
         }
         Verb::Get(args) => {
             trace!("Called get: {:?}", args);
-            let result = db::get(args, &args.key);
+            let result = db::get(&args.db, &args.key);
             trace!("Result: {:?}", result);
         }
         Verb::Delete(args) => {
             trace!("Called delete: {:?}", args);
-            let result = db::delete(args, &args.key);
+            let result = db::delete(&args.db, &args.key);
             trace!("Result: {:?}", result);
         }
         Verb::List(args) => {
             trace!("Called list: {:?}", args);
-            let result = db::list(args, &args.prefix);
+            let result = db::list(&args.db, &args.prefix);
             trace!("Result: {:?}", result);
         }
     }
