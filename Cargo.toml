@@ -37,32 +37,37 @@ tempfile = { version = "3" }
 
 # Logging / Tracing ==========
 tera = { version = "1.16" }
-tracing = { version = "0.1.35" }
-tracing-appender = { version = "0.2.2" }
-tracing-subscriber = { version = "0.3.11" }
+tracing = { version = "0.1" }
+tracing-appender = { version = "0.2" }
+tracing-subscriber = { version = "0.3" }
 # ========== Logging / Tracing
 
 # Error handling
 simple-error = { version = "0.2.3" }
 
 # GRPC ========================
-tonic = "0.7"
-tonic-reflection = "0.4"
-tokio = { version = "1.18", features = ["macros", "rt-multi-thread"] }
-prost = { version = "0.10" }
+# https://www.swiftdiaries.com/rust/tonic/
+tonic = { version = "0.10.2", features = [ "tls" ] }
+tonic-reflection = "0.10.2"
+tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread"] }
+prost = { version = "0.12.1" }
+prost-types = { version = "0.12.1" }
+chrono = { version = "0.4.31", default-features = false }
+tower = "0.4.13"
 # ======================== GRPC
+
 
 # DuckDB =====================
 duckdb = { version = "0.6", features = ["bundled"] }
 # ===================== DuckDB
 
 # RocksDB =====================
+# https://docs.rs/rocksdb/0.18.0/rocksdb/
 rocksdb = { version = "0.18" }
 # ===================== RocksDB
-
 
 
 [build-dependencies]
 
 # GRPC
-tonic-build = { version = "0.7" }
+tonic-build = { version = "0.9" }
