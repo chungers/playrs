@@ -68,7 +68,6 @@ duckdb = { version = "1.0.0", features = ["bundled"] }
 rocksdb = { version = "0.22" }
 # ===================== RocksDB
 
-
 [build-dependencies]
 
 # GRPC
