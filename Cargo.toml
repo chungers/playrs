@@ -20,7 +20,7 @@ arrow = { version = "33.0.0" }
 # === Apache Arrow
 
 # CLI ============
-clap  = { version = "3.2.5", features = ["derive", "env"] }
+clap = { version = "3.2.5", features = ["derive", "env"] }
 # ============ CLI
 
 # SERDE ==========
@@ -47,7 +47,7 @@ simple-error = { version = "0.2.3" }
 
 # GRPC ========================
 # https://www.swiftdiaries.com/rust/tonic/
-tonic = { version = "0.10.2", features = [ "tls" ] }
+tonic = { version = "0.10.2", features = ["tls"] }
 tonic-reflection = "0.10.2"
 tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread"] }
 prost = { version = "0.12.1" }
@@ -65,7 +65,6 @@ duckdb = { version = "0.6", features = ["bundled"] }
 # https://docs.rs/rocksdb/0.21.0/rocksdb/
 rocksdb = { version = "0.21" }
 # ===================== RocksDB
-
 
 [build-dependencies]
 
