@@ -66,22 +66,6 @@ duckdb = { version = "0.6", features = ["bundled"] }
 rocksdb = { version = "0.21" }
 # ===================== RocksDB
 
-
-
-# GCP ========================
-# https://docs.rs/gcloud-sdk/latest/gcloud_sdk/
-[dependencies.gcloud-sdk]
-version = "0.20"
-default-features = false
-features = [
-"rest",
-"google-rest-storage-v1",
-"google-iam-v2",
-"google-iam-credentials-v1"
-]
-
-
-
 [build-dependencies]
 
 # GRPC
