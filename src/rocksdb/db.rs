@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-use rocksdb::{IteratorMode, DB};
+use rocksdb::{Direction, IteratorMode, DB};
 use simple_error::SimpleError;
 use std::error::Error;
 use std::fmt;
@@ -136,7 +136,7 @@ pub fn list(info: &dyn DbInfo, key: &str) -> Result<(), Box<dyn std::error::Erro
     trace!("List path={}, key={}", info.path(), key);
     let db = DB::open_default(check_path(info.path())?)?;
     trace!("DB = {:?}", db);
-    let iter = db.iterator(IteratorMode::Start); // Always iterates forward
+    let iter = db.iterator(IteratorMode::From(key.as_bytes(), Direction::Forward));
     for item in iter {
         let (k, v) = item.unwrap();
         println!(
