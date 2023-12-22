@@ -71,7 +71,7 @@ pub fn init(info: &dyn DbInfo) -> Result<(), Box<dyn std::error::Error>> {
     let p = check_new_path(info.path())?;
     match DB::open_default(p) {
         Ok(_) => {
-            info!("Db init at path = {}", info.path());
+            trace!("Db init at path = {}", info.path());
             Ok(())
         }
         Err(e) => {
@@ -85,7 +85,7 @@ pub fn put(info: &dyn DbInfo, key: &str, value: &str) -> Result<(), Box<dyn std:
     trace!("Put path={}, key={}, value={}", info.path(), key, value);
 
     let db = DB::open_default(check_path(info.path())?)?;
-    info!("DB = {:?}", db);
+    trace!("DB = {:?}", db);
 
     match db.put(key.as_bytes(), value.as_bytes()) {
         Ok(()) => Ok(()),
@@ -100,7 +100,7 @@ pub fn get(info: &dyn DbInfo, key: &str) -> Result<Option<String>, Box<dyn std::
     trace!("Get path={}, key={}", info.path(), key);
 
     let db = DB::open_default(check_path(info.path())?)?;
-    info!("DB = {:?}", db);
+    trace!("DB = {:?}", db);
 
     match db.get(key.as_bytes()) {
         Ok(Some(v)) => {
@@ -120,9 +120,9 @@ pub fn get(info: &dyn DbInfo, key: &str) -> Result<Option<String>, Box<dyn std::
 }
 
 pub fn delete(info: &dyn DbInfo, key: &str) -> Result<(), Box<dyn std::error::Error>> {
-    trace!("Put path={}, key={}", info.path(), key);
+    trace!("Delete path={}, key={}", info.path(), key);
     let db = DB::open_default(check_path(info.path())?)?;
-    info!("DB = {:?}", db);
+    trace!("DB = {:?}", db);
     match db.delete(key.as_bytes()) {
         Ok(()) => Ok(()),
         Err(e) => {
@@ -133,9 +133,9 @@ pub fn delete(info: &dyn DbInfo, key: &str) -> Result<(), Box<dyn std::error::Er
 }
 
 pub fn list(info: &dyn DbInfo, key: &str) -> Result<(), Box<dyn std::error::Error>> {
-    trace!("Put path={}, key={}", info.path(), key);
+    trace!("List path={}, key={}", info.path(), key);
     let db = DB::open_default(check_path(info.path())?)?;
-    info!("DB = {:?}", db);
+    trace!("DB = {:?}", db);
     let iter = db.iterator(IteratorMode::Start); // Always iterates forward
     for item in iter {
         let (k, v) = item.unwrap();
