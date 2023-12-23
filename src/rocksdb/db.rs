@@ -66,6 +66,10 @@ pub trait DbInfo {
     fn path(&self) -> &str;
 }
 
+pub trait VisitKV {
+    fn visit(&self, _: &[u8], _: &[u8]);
+}
+
 pub fn init(info: &dyn DbInfo) -> Result<(), Box<dyn std::error::Error>> {
     trace!("Init path={}", info.path());
     let p = check_new_path(info.path())?;
@@ -96,7 +100,11 @@ pub fn put(info: &dyn DbInfo, key: &str, value: &str) -> Result<(), Box<dyn std:
     }
 }
 
-pub fn get(info: &dyn DbInfo, key: &str) -> Result<Option<String>, Box<dyn std::error::Error>> {
+pub fn get(
+    info: &dyn DbInfo,
+    key: &str,
+    visitor: &dyn VisitKV,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
     trace!("Get path={}, key={}", info.path(), key);
 
     let db = DB::open_default(check_path(info.path())?)?;
@@ -106,6 +114,9 @@ pub fn get(info: &dyn DbInfo, key: &str) -> Result<Option<String>, Box<dyn std::
         Ok(Some(v)) => {
             let result = String::from_utf8(v).unwrap();
             trace!("Finding '{}' returns '{}'", key, result);
+
+            visitor.visit(key.as_bytes(), result.as_bytes());
+
             Ok(Some(result))
         }
         Ok(None) => {
@@ -132,18 +143,18 @@ pub fn delete(info: &dyn DbInfo, key: &str) -> Result<(), Box<dyn std::error::Er
     }
 }
 
-pub fn list(info: &dyn DbInfo, key: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn list(
+    info: &dyn DbInfo,
+    key: &str,
+    visitor: &dyn VisitKV,
+) -> Result<(), Box<dyn std::error::Error>> {
     trace!("List path={}, key={}", info.path(), key);
     let db = DB::open_default(check_path(info.path())?)?;
     trace!("DB = {:?}", db);
     let iter = db.iterator(IteratorMode::From(key.as_bytes(), Direction::Forward));
     for item in iter {
         let (k, v) = item.unwrap();
-        println!(
-            "{} {}",
-            String::from_utf8(k.to_vec()).unwrap(),
-            String::from_utf8(v.to_vec()).unwrap()
-        );
+        visitor.visit(&k, &v);
     }
     Ok(())
 }

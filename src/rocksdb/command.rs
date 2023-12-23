@@ -89,8 +89,21 @@ pub struct ListArgs {
     prefix: String,
 }
 
+struct Visitor(i32);
+
+impl db::VisitKV for Visitor {
+    fn visit(&self, k: &[u8], v: &[u8]) {
+        println!(
+            "k={:?}, v={:?}",
+            String::from_utf8(k.to_vec()).unwrap(),
+            String::from_utf8(v.to_vec()).unwrap()
+        );
+    }
+}
+
 pub fn go(cmd: &Command) {
     trace!("Running command: {:?}", cmd);
+    let visit = Visitor(0);
 
     match &cmd.verb {
         Verb::Init(args) => {
@@ -105,7 +118,7 @@ pub fn go(cmd: &Command) {
         }
         Verb::Get(args) => {
             trace!("Called get: {:?}", args);
-            let result = db::get(&args.db, &args.key);
+            let result = db::get(&args.db, &args.key, &visit);
             trace!("Result: {:?}", result);
         }
         Verb::Delete(args) => {
@@ -115,7 +128,7 @@ pub fn go(cmd: &Command) {
         }
         Verb::List(args) => {
             trace!("Called list: {:?}", args);
-            let result = db::list(&args.db, &args.prefix);
+            let result = db::list(&args.db, &args.prefix, &visit);
             trace!("Result: {:?}", result);
         }
     }
