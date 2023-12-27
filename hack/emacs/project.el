@@ -207,7 +207,9 @@ it blindly to other people's files can cause enormously messy diffs!"
           (lambda () (setq indent-tabs-mode nil)))
 (add-hook 'rust-mode-hook
           (lambda () (prettify-symbols-mode)))
+(define-key rust-mode-map (kbd "C-c C-b") 'rust-compile)
 (define-key rust-mode-map (kbd "C-c C-c") 'rust-run)
+(define-key rust-mode-map (kbd "C-c C-t") 'rust-test)
 (setq rust-format-on-save t)
 
 
