@@ -2,64 +2,80 @@
 use tracing::{debug, error, info, trace, warn};
 
 use rocksdb::{Direction, IteratorMode, DB};
-use simple_error::SimpleError;
 use std::error::Error;
 use std::fmt;
 use std::path::Path;
 
 #[derive(Debug)]
-struct ErrDbPathIsAFile {
+struct ErrBadDbPath {
+    symlink: bool,
     path: String,
 }
 
-impl ErrDbPathIsAFile {
-    fn new(path: &str) -> ErrDbPathIsAFile {
-        ErrDbPathIsAFile {
+impl ErrBadDbPath {
+    fn file(path: &str) -> ErrBadDbPath {
+        ErrBadDbPath {
+            symlink: false,
             path: path.to_string(),
         }
     }
-}
-
-impl fmt::Display for ErrDbPathIsAFile {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "DbPath is a file: {}", self.path)
+    fn symlink(path: &str) -> ErrBadDbPath {
+        ErrBadDbPath {
+            symlink: true,
+            path: path.to_string(),
+        }
+    }
+    fn is_symlink(&self) -> bool {
+        return self.symlink;
     }
 }
 
-impl Error for ErrDbPathIsAFile {
+impl fmt::Display for ErrBadDbPath {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Database path is not a directory: {:?} symlink={:?}",
+            self.path,
+            self.is_symlink()
+        )
+    }
+}
+
+impl Error for ErrBadDbPath {
     fn description(&self) -> &str {
         &self.path
     }
 }
 
-// inverse of check_new_path
 fn check_path(path: &str) -> Result<&Path, Box<dyn std::error::Error>> {
-    match check_new_path(path) {
-        Ok(p) => Err(Box::new(SimpleError::new(format!(
-            "path doesn't exist: {}",
-            p.display(),
-        )))),
-        Err(_) => Ok(Path::new(path)),
-    }
-}
-
-fn check_new_path(path: &str) -> Result<&Path, Box<dyn std::error::Error>> {
-    trace!("Checking path={}", path);
     let p = Path::new(path);
-    if p.exists() {
-        // artificial case to return a custom error type
-        if p.is_file() {
-            error!("Path is a file: {}", path);
-            return Err(Box::new(ErrDbPathIsAFile::new(path)));
-        }
-
-        trace!("Path exists: {}", path);
-        return Err(Box::new(SimpleError::new(format!(
-            "Path already exists: {}",
-            path
-        ))));
+    if !p.exists() {
+        return Ok(p); // rocksdb will create & init db at the path
+    }
+    if p.is_file() {
+        error!("Path is a file: {}", path);
+        return Err(Box::new(ErrBadDbPath::file(path)));
+    }
+    if p.is_symlink() {
+        error!("Path is a file: {}", path);
+        return Err(Box::new(ErrBadDbPath::symlink(path)));
     }
     Ok(p)
+}
+
+#[test]
+fn test_check_path() {
+    let p = Path::new("/bin");
+    match check_path(p.to_str().unwrap()) {
+        Ok(pp) => assert_eq!(pp, p),
+        Err(_) => panic!("Valid directory /tmp"),
+    }
+
+    let p = Path::new("/bin/bash");
+    match check_path(p.to_str().unwrap()) {
+        Ok(_) => panic!("Shouldn't be ok with a file"),
+        Err(_) => {}
+    }
 }
 
 pub trait DbInfo {
@@ -72,7 +88,7 @@ pub trait VisitKV {
 
 pub fn init(info: &dyn DbInfo) -> Result<(), Box<dyn std::error::Error>> {
     trace!("Init path={}", info.path());
-    let p = check_new_path(info.path())?;
+    let p = check_path(info.path())?;
     match DB::open_default(p) {
         Ok(_) => {
             trace!("Db init at path = {}", info.path());
