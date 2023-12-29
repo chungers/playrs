@@ -20,16 +20,10 @@ notify = { version = "6.1.1" }
 # Apache Arrow ===
 # Used by Duckdb example also
 arrow = { version = "52.2.0" }
+
 # === Apache Arrow
-
-
-<<<<<<< HEAD
-clap = { version = "4.1.5", features = ["derive", "env"] }
-=======
 # CLI ============
-
->>>>>>> 34c2c58 (Remove junk)
-clap = { version = "3.2.5", features = ["derive", "env"] }
+clap = { version = "4.1.5", features = ["derive", "env"] }
 # ============ CLI
 
 # SERDE ==========
