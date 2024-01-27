@@ -2,6 +2,8 @@
 #[path = "db.rs"] // using path isn't ideal
 mod db;
 
+use crate::rocksdb::graph::{Edge, Node};
+
 use clap::{Args as clapArgs, Subcommand};
 
 #[allow(unused_imports)]
@@ -21,6 +23,8 @@ pub enum Verb {
     Get(GetArgs),
     Delete(DeleteArgs),
     List(ListArgs),
+    Node(NodeArgs),
+    Edge(EdgeArgs),
 }
 
 #[derive(Debug, clapArgs, PartialEq, Eq)]
@@ -89,6 +93,30 @@ pub struct ListArgs {
     prefix: String,
 }
 
+#[derive(Debug, clapArgs)]
+pub struct NodeArgs {
+    /// The DB path
+    db: DbArgs,
+    /// The name of the node
+    name: String,
+    /// The description of the node
+    description: Option<String>,
+}
+
+#[derive(Debug, clapArgs)]
+pub struct EdgeArgs {
+    /// The DB path
+    db: DbArgs,
+    /// The head id
+    head: u64,
+    /// The tail id
+    tail: u64,
+    /// The name of the edge / relation
+    name: String,
+    /// The description
+    description: Option<String>,
+}
+
 struct Visitor(i32);
 
 impl db::VisitKV for Visitor {
@@ -129,6 +157,28 @@ pub fn go(cmd: &Command) {
         Verb::List(args) => {
             trace!("Called list: {:?}", args);
             let result = db::list(&args.db, &args.prefix, &visit);
+            trace!("Result: {:?}", result);
+        }
+        Verb::Node(args) => {
+            trace!("Called node: {:?}", args);
+            let mut node = Node {
+                id: 0,
+                name: args.name.clone(),
+                description: args.description.clone(),
+            };
+            let result = db::put_node(&args.db, &mut node);
+            trace!("Result: {:?}", result);
+        }
+        Verb::Edge(args) => {
+            trace!("Called node: {:?}", args);
+            let mut edge = Edge {
+                id: 0,
+                head: args.head,
+                tail: args.tail,
+                name: args.name.clone(),
+                description: args.description.clone(),
+            };
+            let result = db::put_edge(&args.db, &mut edge);
             trace!("Result: {:?}", result);
         }
     }
