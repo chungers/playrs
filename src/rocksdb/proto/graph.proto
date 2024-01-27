@@ -1,32 +1,17 @@
 syntax = "proto3";
 
-<<<<<<< HEAD
-package graph.proto.v1;
-=======
 package rocksdb.graph.v1;
->>>>>>> 67429fd (Refactoring open_db; start building a graph db)
 
 message Node {
     uint64 id = 1;
     string name = 2;
-<<<<<<< HEAD
-    optional string doc = 3;
-=======
     optional string description = 3;
->>>>>>> 67429fd (Refactoring open_db; start building a graph db)
 }
 
 message Edge {
     uint64 id = 1;
-<<<<<<< HEAD
-    string name = 2;
-    uint64 head = 3;
-    uint64 tail = 4;
-    optional string doc = 5;
-=======
     uint64 head = 2;
     uint64 tail = 3;
     string name = 4;
     optional string description = 5;
->>>>>>> 67429fd (Refactoring open_db; start building a graph db)
 }
