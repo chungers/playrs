@@ -1,7 +1,9 @@
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-use rocksdb::{Direction, IteratorMode, DB};
+use crate::rocksdb::graph::{Edge, Node};
+use rocksdb::{DBWithThreadMode, Direction, IteratorMode, SingleThreaded, DB};
+use std::convert::TryInto;
 use std::error;
 use std::fmt;
 use std::path::Path;
@@ -88,10 +90,96 @@ pub fn init(info: &dyn DbInfo) -> Result<(), Box<dyn error::Error>> {
     }
 }
 
+fn open_db(
+    info: &dyn DbInfo,
+) -> Result<rocksdb::DBWithThreadMode<rocksdb::SingleThreaded>, Box<dyn error::Error>> {
+    match DB::open_default(check_path(info.path())?) {
+        Ok(db) => {
+            trace!("Db init at path = {}", info.path());
+            Ok(db)
+        }
+        Err(e) => {
+            error!("Error init db at path = {}, error = {}", info.path(), e);
+            Err(Box::new(e))
+        }
+    }
+}
+
+static SEQ_KEY: &str = "system.sequence";
+
+fn next_id(db: DBWithThreadMode<SingleThreaded>) -> Result<u64, Box<dyn error::Error>> {
+    trace!("DB = {:?}", db);
+
+    let id: u64;
+
+    match db.get(SEQ_KEY.as_bytes()) {
+        Ok(Some(v)) => {
+            let be = v.try_into().unwrap_or_else(|v: Vec<u8>| {
+                panic!("Expected a Vec of length {} but it was {}", 8, v.len())
+            });
+
+            id = u64::from_le_bytes(be) + 1;
+            trace!("id read: {}", id);
+        }
+        Ok(None) => {
+            id = 1;
+        }
+        Err(e) => {
+            error!("error::Error retrieving value for {}: {}", SEQ_KEY, e);
+            return Err(Box::new(e));
+        }
+    }
+
+    // update the id before returning the value
+    match db.put(SEQ_KEY.as_bytes(), id.to_le_bytes().to_vec()) {
+        Ok(()) => Ok(id),
+        Err(e) => {
+            error!("Error updating sequence {}", SEQ_KEY);
+            Err(Box::new(e))
+        }
+    }
+}
+
+pub fn put_node<'a>(
+    info: &'a dyn DbInfo,
+    node: &'a mut Node,
+) -> Result<&'a Node, Box<dyn error::Error>> {
+    trace!("node: {:?}", node);
+
+    let db = open_db(info).unwrap();
+    let id = next_id(db).unwrap();
+    node.id = id;
+
+    info!("node: {:?}", node);
+    Ok(node)
+}
+
+pub fn put_edge<'a>(
+    info: &'a dyn DbInfo,
+    edge: &'a mut Edge,
+) -> Result<&'a Edge, Box<dyn error::Error>> {
+    trace!("edge: {:?}", edge);
+
+    let db = open_db(info).unwrap();
+    let id = next_id(db).unwrap();
+    edge.id = id;
+
+    info!("edge: {:?}", edge);
+    Ok(edge)
+}
+
+pub fn get_node(info: &dyn DbInfo, name: &String) -> Result<Option<Node>, Box<dyn error::Error>> {
+    Ok(None)
+}
+
+pub fn get_edge(info: &dyn DbInfo, name: &String) -> Result<Option<Edge>, Box<dyn error::Error>> {
+    Ok(None)
+}
+
 pub fn put(info: &dyn DbInfo, key: &str, value: &str) -> Result<(), Box<dyn error::Error>> {
     trace!("Put path={}, key={}, value={}", info.path(), key, value);
 
-    let db = DB::open_default(check_path(info.path())?)?;
+    let db = open_db(info)?;
     trace!("DB = {:?}", db);
 
     match db.put(key.as_bytes(), value.as_bytes()) {
@@ -110,7 +198,7 @@ pub fn get(
 ) -> Result<Option<String>, Box<dyn error::Error>> {
     trace!("Get path={}, key={}", info.path(), key);
 
-    let db = DB::open_default(check_path(info.path())?)?;
+    let db = open_db(info)?;
     trace!("DB = {:?}", db);
 
     match db.get(key.as_bytes()) {
@@ -135,7 +223,7 @@ pub fn get(
 
 pub fn delete(info: &dyn DbInfo, key: &str) -> Result<(), Box<dyn error::Error>> {
     trace!("Delete path={}, key={}", info.path(), key);
-    let db = DB::open_default(check_path(info.path())?)?;
+    let db = open_db(info)?;
     trace!("DB = {:?}", db);
     match db.delete(key.as_bytes()) {
         Ok(()) => Ok(()),
@@ -152,7 +240,7 @@ pub fn list(
     visitor: &dyn VisitKV,
 ) -> Result<(), Box<dyn error::Error>> {
     trace!("List path={}, key={}", info.path(), key);
-    let db = DB::open_default(check_path(info.path())?)?;
+    let db = open_db(info)?;
     trace!("DB = {:?}", db);
     let iter = db.iterator(IteratorMode::From(key.as_bytes(), Direction::Forward));
     for item in iter {
