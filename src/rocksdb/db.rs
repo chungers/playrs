@@ -2,7 +2,7 @@
 use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::graph::{Edge, Node};
-use rocksdb::{DBWithThreadMode, Direction, IteratorMode, SingleThreaded, DB};
+use rocksdb::{DBWithThreadMode, Direction, IteratorMode, Options, SingleThreaded, DB};
 use std::convert::TryInto;
 use std::error;
 use std::fmt;
@@ -90,29 +90,50 @@ pub fn init(info: &dyn DbInfo) -> Result<(), Box<dyn error::Error>> {
     }
 }
 
-fn open_db(
-    info: &dyn DbInfo,
-) -> Result<rocksdb::DBWithThreadMode<rocksdb::SingleThreaded>, Box<dyn error::Error>> {
-    match DB::open_default(check_path(info.path())?) {
-        Ok(db) => {
-            trace!("Db init at path = {}", info.path());
-            Ok(db)
-        }
-        Err(e) => {
-            error!("Error init db at path = {}, error = {}", info.path(), e);
-            Err(Box::new(e))
+// type ColumnFamily<'a> = &'a str;
+// static CF_SYSTEM: ColumnFamily = "cf.system";
+// static CF_DEFAULT: ColumnFamily = "cf.default";
+// static CF_NODES: ColumnFamily = "cf.nodes";
+// static CF_EDGES: ColumnFamily = "cf.edges";
+
+static CF_SYSTEM: &str = "cf.system";
+static CF_DEFAULT: &str = "cf.default";
+static CF_NODES: &str = "cf.nodes";
+static CF_EDGES: &str = "cf.edges";
+static SEQ_KEY: &str = "sequence";
+
+fn open_db(info: &dyn DbInfo) -> Result<DBWithThreadMode<SingleThreaded>, Box<dyn error::Error>> {
+    let mut options = Options::default();
+    options.set_error_if_exists(false);
+    options.create_if_missing(true);
+    options.create_missing_column_families(true);
+
+    // list existing ColumnFamilies in the given path. returns Err when no DB exists.
+    let cfs = DB::list_cf(&options, check_path(info.path())?).unwrap_or(vec![]);
+    // open a DB with specifying ColumnFamilies
+    let mut instance = DB::open_cf(&options, check_path(info.path())?, cfs.clone())?;
+
+    for c in vec![CF_SYSTEM, CF_DEFAULT, CF_NODES, CF_EDGES].into_iter() {
+        let missing = cfs.iter().find(|cf| cf == &c).is_none();
+
+        if missing {
+            // create a new ColumnFamily
+            let options = rocksdb::Options::default();
+            instance.create_cf(c, &options).unwrap();
         }
     }
-}
 
-static SEQ_KEY: &str = "system.sequence";
+    Ok(instance)
+}
 
 fn next_id(db: DBWithThreadMode<SingleThreaded>) -> Result<u64, Box<dyn error::Error>> {
     trace!("DB = {:?}", db);
 
     let id: u64;
 
-    match db.get(SEQ_KEY.as_bytes()) {
+    // TODO inefficient - refactor later
+    let cf = db.cf_handle(CF_SYSTEM).unwrap();
+    match db.get_cf(cf, SEQ_KEY.as_bytes()) {
         Ok(Some(v)) => {
             let be = v.try_into().unwrap_or_else(|v: Vec<u8>| {
                 panic!("Expected a Vec of length {} but it was {}", 8, v.len())
@@ -131,7 +152,7 @@ fn next_id(db: DBWithThreadMode<SingleThreaded>) -> Result<u64, Box<dyn error::E
     }
 
     // update the id before returning the value
-    match db.put(SEQ_KEY.as_bytes(), id.to_le_bytes().to_vec()) {
+    match db.put_cf(cf, SEQ_KEY.as_bytes(), id.to_le_bytes().to_vec()) {
         Ok(()) => Ok(id),
         Err(e) => {
             error!("Error updating sequence {}", SEQ_KEY);
@@ -146,10 +167,11 @@ pub fn put_node<'a>(
 ) -> Result<&'a Node, Box<dyn error::Error>> {
     trace!("node: {:?}", node);
 
-    let db = open_db(info).unwrap();
-    let id = next_id(db).unwrap();
+    let id = next_id(open_db(info)?)?;
     node.id = id;
 
+    // TODO write to a different column family
+    // let db = open_db(info, CF_NODES)?;
     info!("node: {:?}", node);
     Ok(node)
 }
@@ -160,19 +182,22 @@ pub fn put_edge<'a>(
 ) -> Result<&'a Edge, Box<dyn error::Error>> {
     trace!("edge: {:?}", edge);
 
-    let db = open_db(info).unwrap();
-    let id = next_id(db).unwrap();
+    let id = next_id(open_db(info)?)?;
     edge.id = id;
 
     info!("edge: {:?}", edge);
     Ok(edge)
 }
 
+#[allow(dead_code)]
 pub fn get_node(info: &dyn DbInfo, name: &String) -> Result<Option<Node>, Box<dyn error::Error>> {
+    trace!("db: {:?}, node name: {:?}", info.path(), name);
     Ok(None)
 }
 
+#[allow(dead_code)]
 pub fn get_edge(info: &dyn DbInfo, name: &String) -> Result<Option<Edge>, Box<dyn error::Error>> {
+    trace!("db: {:?}, edge name: {:?}", info.path(), name);
     Ok(None)
 }
 
