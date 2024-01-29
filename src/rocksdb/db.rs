@@ -75,33 +75,45 @@ pub trait VisitKV {
     fn visit(&self, _: &[u8], _: &[u8]);
 }
 
-pub fn init(info: &dyn DbInfo) -> Result<(), Box<dyn error::Error>> {
-    trace!("Init path={}", info.path());
-    let p = check_path(info.path())?;
-    match DB::open_default(p) {
-        Ok(_) => {
-            trace!("Db init at path = {}", info.path());
-            Ok(())
-        }
-        Err(e) => {
-            error!("Error init db at path = {}, error = {}", info.path(), e);
-            Err(Box::new(e))
-        }
-    }
-}
-
-// type ColumnFamily<'a> = &'a str;
-// static CF_SYSTEM: ColumnFamily = "cf.system";
-// static CF_DEFAULT: ColumnFamily = "cf.default";
-// static CF_NODES: ColumnFamily = "cf.nodes";
-// static CF_EDGES: ColumnFamily = "cf.edges";
-
 static CF_SYSTEM: &str = "cf.system";
 static CF_DEFAULT: &str = "cf.default";
 static CF_NODES: &str = "cf.nodes";
 static CF_EDGES: &str = "cf.edges";
 static SEQ_KEY: &str = "sequence";
 
+pub fn init(info: &dyn DbInfo) -> Result<(), Box<dyn error::Error>> {
+    trace!("Init path={}", info.path());
+    let p = check_path(info.path())?;
+
+    trace!("Db init at path = {}", info.path());
+
+    let mut options = Options::default();
+    options.set_error_if_exists(false);
+    options.create_if_missing(true);
+    options.create_missing_column_families(true);
+
+    let cfs = DB::list_cf(&options, p).unwrap_or(vec![]);
+
+    // open a DB with specifying ColumnFamilies
+    let mut instance = DB::open_cf(&options, check_path(info.path())?, cfs.clone())?;
+
+    for c in vec![CF_SYSTEM, CF_DEFAULT, CF_NODES, CF_EDGES].into_iter() {
+        if cfs.iter().find(|cf| cf == &c).is_none() {
+            // create a new ColumnFamily
+            info!("Creating column family {:?}", c);
+            let options = Options::default();
+            let create_cf = instance.create_cf(c, &options)?;
+            info!("Creating column family {:?}, result = {:?}", c, create_cf);
+        } else {
+            info!("Found column family {:?}", c);
+        }
+    }
+
+    Ok(())
+}
+
+// TODO - Optimize this a bit more so that opening the database simply
+// opens all the column families, without creating them (do that in "init").
 fn open_db(info: &dyn DbInfo) -> Result<DBWithThreadMode<SingleThreaded>, Box<dyn error::Error>> {
     let mut options = Options::default();
     options.set_error_if_exists(false);
@@ -114,12 +126,11 @@ fn open_db(info: &dyn DbInfo) -> Result<DBWithThreadMode<SingleThreaded>, Box<dy
     let mut instance = DB::open_cf(&options, check_path(info.path())?, cfs.clone())?;
 
     for c in vec![CF_SYSTEM, CF_DEFAULT, CF_NODES, CF_EDGES].into_iter() {
-        let missing = cfs.iter().find(|cf| cf == &c).is_none();
-
-        if missing {
+        if cfs.iter().find(|cf| cf == &c).is_none() {
             // create a new ColumnFamily
             let options = rocksdb::Options::default();
-            instance.create_cf(c, &options).unwrap();
+            let create_cf = instance.create_cf(c, &options).unwrap();
+            warn!("Creating column family {:?}, result = {:?}", c, create_cf);
         }
     }
 
