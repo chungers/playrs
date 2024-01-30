@@ -9,24 +9,6 @@ use clap::{Args as clapArgs, Subcommand};
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-#[derive(Debug, clapArgs)]
-#[clap(args_conflicts_with_subcommands = true)]
-pub struct Command {
-    #[clap(subcommand)]
-    pub verb: Verb,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum Verb {
-    Init(DbArgs),
-    Put(PutArgs),
-    Get(GetArgs),
-    Delete(DeleteArgs),
-    List(ListArgs),
-    Node(NodeCommand),
-    Edge(EdgeArgs),
-}
-
 #[derive(Debug, clapArgs, PartialEq, Eq)]
 pub struct DbArgs {
     /// The DB path
@@ -54,6 +36,24 @@ impl std::str::FromStr for DbArgs {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::from_str(s)
     }
+}
+
+#[derive(Debug, clapArgs)]
+#[clap(args_conflicts_with_subcommands = true)]
+pub struct Command {
+    #[clap(subcommand)]
+    pub verb: Verb,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Verb {
+    Init(DbArgs),
+    Put(PutArgs),
+    Get(GetArgs),
+    Delete(DeleteArgs),
+    List(ListArgs),
+    Node(NodeCommand),
+    Edge(EdgeCommand),
 }
 
 #[derive(Debug, clapArgs)]
@@ -122,9 +122,21 @@ pub struct NodeGetArgs {
 }
 
 #[derive(Debug, clapArgs)]
-pub struct EdgeArgs {
+pub struct EdgeCommand {
     /// The DB path
     db: DbArgs,
+    #[clap(subcommand)]
+    verb: EdgeVerb,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum EdgeVerb {
+    Put(EdgePutArgs),
+    Get(EdgeGetArgs),
+}
+
+#[derive(Debug, clapArgs)]
+pub struct EdgePutArgs {
     /// The head id
     head: u64,
     /// The tail id
@@ -133,6 +145,12 @@ pub struct EdgeArgs {
     name: String,
     /// The description
     description: Option<String>,
+}
+
+#[derive(Debug, clapArgs)]
+pub struct EdgeGetArgs {
+    /// The id of the node
+    id: u64,
 }
 
 struct Visitor(i32);
@@ -179,7 +197,6 @@ pub fn go(cmd: &Command) {
         }
         Verb::Node(cmd) => {
             trace!("Called node: {:?}", cmd);
-
             match &cmd.verb {
                 NodeVerb::Put(args) => {
                     let mut node = Node {
@@ -207,17 +224,33 @@ pub fn go(cmd: &Command) {
                 }
             }
         }
-        Verb::Edge(args) => {
-            trace!("Called node: {:?}", args);
-            let mut edge = Edge {
-                id: 0,
-                head: args.head,
-                tail: args.tail,
-                name: args.name.clone(),
-                description: args.description.clone(),
-            };
-            let result = db::put_edge(&args.db, &mut edge);
-            trace!("Result: {:?}", result);
-        }
+        Verb::Edge(cmd) => match &cmd.verb {
+            EdgeVerb::Put(args) => {
+                let mut edge = Edge {
+                    id: 0,
+                    head: args.head,
+                    tail: args.tail,
+                    name: args.name.clone(),
+                    description: args.description.clone(),
+                };
+                let result = db::put_edge(&cmd.db, &mut edge);
+                info!("Result: {:?}", result);
+            }
+            EdgeVerb::Get(args) => {
+                let result = db::get_edge(&cmd.db, args.id);
+                trace!("Result: {:?}", result);
+                match result {
+                    Ok(Some(edge)) => {
+                        info!("{:?}", edge);
+                    }
+                    Ok(None) => {
+                        info!("not found");
+                    }
+                    Err(e) => {
+                        error!("Error: {:?}", e);
+                    }
+                }
+            }
+        },
     }
 }
