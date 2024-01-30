@@ -183,8 +183,6 @@ pub fn put_node<'a>(
     let id = next_id(&db)?;
     node.id = id;
 
-    // TODO write to a different column family
-    // let db = open_db(info, CF_NODES)?;
     info!("node: {:?}, encoded = {:?}", node, node.encode_to_vec());
 
     let cf = db.cf_handle(CF_NODES).unwrap();
@@ -226,14 +224,36 @@ pub fn put_edge<'a>(
     let id = next_id(&db)?;
     edge.id = id;
 
-    info!("edge: {:?}", edge);
+    info!("edge: {:?}, encoded = {:?}", edge, edge.encode_to_vec());
+
+    let cf = db.cf_handle(CF_EDGES).unwrap();
+    db.put_cf(cf, u64::to_le_bytes(id), edge.encode_to_vec())?;
+
     Ok(edge)
 }
 
 #[allow(dead_code)]
-pub fn get_edge(info: &dyn DbInfo, name: &String) -> Result<Option<Edge>, Box<dyn error::Error>> {
-    trace!("db: {:?}, edge name: {:?}", info.path(), name);
-    Ok(None)
+pub fn get_edge(info: &dyn DbInfo, id: u64) -> Result<Option<Edge>, Box<dyn error::Error>> {
+    trace!("db: {:?}, edge id: {:?}", info.path(), id);
+
+    let db = open_db(info)?;
+
+    let cf = db.cf_handle(CF_EDGES).unwrap();
+    match db.get_cf(cf, u64::to_le_bytes(id)) {
+        Ok(Some(bytes)) => {
+            trace!("Found edge with id = {:?} found {:?}", id, bytes);
+            let decoded: Edge = Message::decode(&bytes[..])?;
+            Ok(Some(decoded))
+        }
+        Ok(None) => {
+            trace!("No edge with id = {:?} found", id);
+            Ok(None)
+        }
+        Err(e) => {
+            error!("Error: {:?}", e);
+            Err(Box::new(e))
+        }
+    }
 }
 
 pub fn put(info: &dyn DbInfo, key: &str, value: &str) -> Result<(), Box<dyn error::Error>> {
