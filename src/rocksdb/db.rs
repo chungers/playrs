@@ -2,6 +2,7 @@
 use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::graph::{Edge, Node};
+use prost::Message; // need the trait to encode protobuf
 use rocksdb::{DBWithThreadMode, Direction, IteratorMode, Options, SingleThreaded, DB};
 use std::convert::TryInto;
 use std::error;
@@ -137,7 +138,7 @@ fn open_db(info: &dyn DbInfo) -> Result<DBWithThreadMode<SingleThreaded>, Box<dy
     Ok(instance)
 }
 
-fn next_id(db: DBWithThreadMode<SingleThreaded>) -> Result<u64, Box<dyn error::Error>> {
+fn next_id(db: &DBWithThreadMode<SingleThreaded>) -> Result<u64, Box<dyn error::Error>> {
     trace!("DB = {:?}", db);
 
     let id: u64;
@@ -178,13 +179,41 @@ pub fn put_node<'a>(
 ) -> Result<&'a Node, Box<dyn error::Error>> {
     trace!("node: {:?}", node);
 
-    let id = next_id(open_db(info)?)?;
+    let db = open_db(info)?;
+    let id = next_id(&db)?;
     node.id = id;
 
     // TODO write to a different column family
     // let db = open_db(info, CF_NODES)?;
-    info!("node: {:?}", node);
+    info!("node: {:?}, encoded = {:?}", node, node.encode_to_vec());
+
+    let cf = db.cf_handle(CF_NODES).unwrap();
+    db.put_cf(cf, u64::to_le_bytes(id), node.encode_to_vec())?;
+
     Ok(node)
+}
+
+pub fn get_node(info: &dyn DbInfo, id: u64) -> Result<Option<Node>, Box<dyn error::Error>> {
+    trace!("db: {:?}, node id: {:?}", info.path(), id);
+
+    let db = open_db(info)?;
+
+    let cf = db.cf_handle(CF_NODES).unwrap();
+    match db.get_cf(cf, u64::to_le_bytes(id)) {
+        Ok(Some(bytes)) => {
+            trace!("Found node with id = {:?} found {:?}", id, bytes);
+            let decoded: Node = Message::decode(&bytes[..])?;
+            Ok(Some(decoded))
+        }
+        Ok(None) => {
+            trace!("No node with id = {:?} found", id);
+            Ok(None)
+        }
+        Err(e) => {
+            error!("Error: {:?}", e);
+            Err(Box::new(e))
+        }
+    }
 }
 
 pub fn put_edge<'a>(
@@ -193,17 +222,12 @@ pub fn put_edge<'a>(
 ) -> Result<&'a Edge, Box<dyn error::Error>> {
     trace!("edge: {:?}", edge);
 
-    let id = next_id(open_db(info)?)?;
+    let db = open_db(info)?;
+    let id = next_id(&db)?;
     edge.id = id;
 
     info!("edge: {:?}", edge);
     Ok(edge)
-}
-
-#[allow(dead_code)]
-pub fn get_node(info: &dyn DbInfo, name: &String) -> Result<Option<Node>, Box<dyn error::Error>> {
-    trace!("db: {:?}, node name: {:?}", info.path(), name);
-    Ok(None)
 }
 
 #[allow(dead_code)]

@@ -23,7 +23,7 @@ pub enum Verb {
     Get(GetArgs),
     Delete(DeleteArgs),
     List(ListArgs),
-    Node(NodeArgs),
+    Node(NodeCommand),
     Edge(EdgeArgs),
 }
 
@@ -94,13 +94,31 @@ pub struct ListArgs {
 }
 
 #[derive(Debug, clapArgs)]
-pub struct NodeArgs {
+pub struct NodeCommand {
     /// The DB path
     db: DbArgs,
+    #[clap(subcommand)]
+    verb: NodeVerb,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum NodeVerb {
+    Put(NodePutArgs),
+    Get(NodeGetArgs),
+}
+
+#[derive(Debug, clapArgs)]
+pub struct NodePutArgs {
     /// The name of the node
     name: String,
     /// The description of the node
     description: Option<String>,
+}
+
+#[derive(Debug, clapArgs)]
+pub struct NodeGetArgs {
+    /// The id of the node
+    id: u64,
 }
 
 #[derive(Debug, clapArgs)]
@@ -159,15 +177,35 @@ pub fn go(cmd: &Command) {
             let result = db::list(&args.db, &args.prefix, &visit);
             trace!("Result: {:?}", result);
         }
-        Verb::Node(args) => {
-            trace!("Called node: {:?}", args);
-            let mut node = Node {
-                id: 0,
-                name: args.name.clone(),
-                description: args.description.clone(),
-            };
-            let result = db::put_node(&args.db, &mut node);
-            trace!("Result: {:?}", result);
+        Verb::Node(cmd) => {
+            trace!("Called node: {:?}", cmd);
+
+            match &cmd.verb {
+                NodeVerb::Put(args) => {
+                    let mut node = Node {
+                        id: 0,
+                        name: args.name.clone(),
+                        description: args.description.clone(),
+                    };
+                    let result = db::put_node(&cmd.db, &mut node);
+                    info!("Result: {:?}", result);
+                }
+                NodeVerb::Get(args) => {
+                    let result = db::get_node(&cmd.db, args.id);
+                    trace!("Result: {:?}", result);
+                    match result {
+                        Ok(Some(node)) => {
+                            info!("{:?}", node);
+                        }
+                        Ok(None) => {
+                            info!("not found");
+                        }
+                        Err(e) => {
+                            error!("Error: {:?}", e);
+                        }
+                    }
+                }
+            }
         }
         Verb::Edge(args) => {
             trace!("Called node: {:?}", args);
