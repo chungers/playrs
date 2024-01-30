@@ -7,6 +7,9 @@ for storing nodes and edges.
 
 ## TODO
 
-+ Use column family to store sequence
-+ Use column family to index nodes by name and store nodes
-+ Use column family to index edges by (head,tail) and name
+- [x] Use column family to store sequence
+- [x] Use column family to store (id, node)
+- [x] Use column family to store (id, edge)
+- [ ] Transactions for inserting into home cf (for nodes, edges) and indexes
+- [ ] Index lookup by name for nodes and edges - iterator (names not unique key)
+- [ ] Index lookup by (head,tail) id for edges - iterator
