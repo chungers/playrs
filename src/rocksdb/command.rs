@@ -1,13 +1,10 @@
-// Test including a module that's at the parent level. not public
-#[path = "db.rs"] // using path isn't ideal
-mod db;
+#[allow(unused_imports)]
+use tracing::{debug, error, info, trace, warn};
 
+use crate::rocksdb::db;
 use crate::rocksdb::graph::{Edge, Node};
 
 use clap::{Args as clapArgs, Subcommand};
-
-#[allow(unused_imports)]
-use tracing::{debug, error, info, trace, warn};
 
 #[derive(Debug, clapArgs, PartialEq, Eq)]
 pub struct DbArgs {
