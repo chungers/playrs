@@ -1,25 +1,93 @@
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
+use prost::Message; // need the trait to encode protobuf
+
+use crate::rocksdb::db;
 use crate::rocksdb::graph::{Edge, Node};
 
 use std::convert::TryInto;
 
-pub trait Index<E> {
+impl db::Entity for Edge {
+    fn key(&self) -> u64 {
+        return self.id;
+    }
+    fn encode(&self) -> Vec<u8> {
+        return self.encode_to_vec();
+    }
+}
+
+impl db::Entity for Node {
+    fn key(&self) -> u64 {
+        return self.id;
+    }
+    fn encode(&self) -> Vec<u8> {
+        return self.encode_to_vec();
+    }
+}
+
+pub trait Indexes<E: db::Entity> {
+    fn indexes() -> Vec<Box<dyn Index<E>>>;
+}
+
+impl Indexes<Node> for Node {
+    fn indexes() -> Vec<Box<dyn Index<Node>>> {
+        return vec![
+            // By Id,
+            Box::new(NodeById),
+            // By name
+            Box::new(NodeByName),
+        ];
+    }
+}
+
+impl Indexes<Edge> for Edge {
+    fn indexes() -> Vec<Box<dyn Index<Edge>>> {
+        return vec![
+            // By Id,
+            Box::new(EdgeById),
+            // By name
+            Box::new(EdgeByName),
+            // By head, tail
+            Box::new(EdgeByHeadTail),
+        ];
+    }
+}
+
+pub trait Index<E: db::Entity> {
     fn cf_name(&self) -> &'static str;
-    fn key_value(&self, obj: &E) -> (Vec<u8>, Vec<u8>);
+    // Default implementation is to store the bytes of the entity
+    fn key_value(&self, e: &E) -> (Vec<u8>, Vec<u8>) {
+        return (e.key().to_le_bytes().to_vec(), e.encode());
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodeById;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodeByName;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct EdgeById;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct EdgeByHeadTail;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct EdgeByName;
+
+impl std::fmt::Debug for dyn Index<Node> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct(self.cf_name()).finish()
+    }
+}
+
+impl std::fmt::Debug for dyn Index<Edge> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct(self.cf_name()).finish()
+    }
+}
 
 impl Index<Node> for NodeById {
     fn cf_name(&self) -> &'static str {
@@ -69,11 +137,25 @@ impl Index<Edge> for EdgeByName {
 }
 
 #[test]
-fn test_build_indexes() {
-    let idx: Vec<Box<dyn Index<Node>>> = vec![Box::new(NodeById), Box::new(NodeByName)];
-    for i in idx.iter() {
-        println!("{:?}", i.cf_name());
+fn test_using_indexes() {
+    for i in Node::indexes().iter() {
+        println!("index = {:?}, cf = {:?}", i, i.cf_name());
     }
+
+    for i in Edge::indexes().iter() {
+        println!("index = {:?}, cf = {:?}", i, i.cf_name());
+    }
+
+    // Test using the helpers
+    println!("cf = {:?}", NodeById.cf_name());
+    println!(
+        "kv = {:?}",
+        NodeByName.key_value(&Node {
+            id: 1u64,
+            name: "foo".into(),
+            description: None,
+        })
+    );
 }
 
 #[test]
