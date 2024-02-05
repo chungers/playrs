@@ -2,12 +2,18 @@
 use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::graph::{Edge, Node};
+
 use prost::Message; // need the trait to encode protobuf
 use rocksdb::{DBWithThreadMode, Direction, IteratorMode, Options, SingleThreaded, DB};
 use std::convert::TryInto;
 use std::error;
 use std::fmt;
 use std::path::Path;
+
+pub trait Entity {
+    fn key(&self) -> u64;
+    fn encode(&self) -> Vec<u8>;
+}
 
 #[derive(Debug, Clone)]
 struct ErrBadDbPath {
