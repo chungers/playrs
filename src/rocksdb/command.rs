@@ -3,8 +3,10 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::db;
 use crate::rocksdb::graph::{Edge, Node};
+use crate::rocksdb::index;
 
 use clap::{Args as clapArgs, Subcommand};
+use rocksdb::Options;
 
 #[derive(Debug, clapArgs, PartialEq, Eq)]
 pub struct DbArgs {
@@ -24,6 +26,13 @@ impl DbArgs {
 impl db::DbInfo for DbArgs {
     fn path(&self) -> &str {
         &self.path
+    }
+    fn options(&self) -> Options {
+        let mut options = Options::default();
+        options.set_error_if_exists(false);
+        options.create_if_missing(true);
+        options.create_missing_column_families(true);
+        return options;
     }
 }
 
@@ -45,6 +54,7 @@ pub struct Command {
 #[derive(Debug, Subcommand)]
 pub enum Verb {
     Init(DbArgs),
+    Indexes(DbArgs),
     Put(PutArgs),
     Get(GetArgs),
     Delete(DeleteArgs),
@@ -169,8 +179,14 @@ pub fn go(cmd: &Command) {
     match &cmd.verb {
         Verb::Init(args) => {
             trace!("Called start: {:?}", args);
-            let result = db::init(args);
+            let result = db::init(args, &index::All);
             trace!("Result: {:?}", result);
+        }
+        Verb::Indexes(args) => {
+            trace!("List Indexes (column families): {:?}", args);
+            let result = db::indexes(args);
+            trace!("Result: {:?}", result);
+            println!("{:?}", result);
         }
         Verb::Put(args) => {
             trace!("Called put: {:?}", args);
