@@ -3,7 +3,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::db;
 use crate::rocksdb::graph::{Edge, Node};
-use crate::rocksdb::index;
+use crate::rocksdb::All;
 
 use clap::{Args as clapArgs, Subcommand};
 use rocksdb::Options;
@@ -150,8 +150,6 @@ pub struct EdgePutArgs {
     tail: u64,
     /// The name of the edge / relation
     name: String,
-    /// The description
-    description: Option<String>,
 }
 
 #[derive(Debug, clapArgs)]
@@ -179,7 +177,7 @@ pub fn go(cmd: &Command) {
     match &cmd.verb {
         Verb::Init(args) => {
             trace!("Called start: {:?}", args);
-            let result = db::init(args, &index::All);
+            let result = db::init(args, &All);
             trace!("Result: {:?}", result);
         }
         Verb::Indexes(args) => {
@@ -215,7 +213,6 @@ pub fn go(cmd: &Command) {
                     let mut node = Node {
                         id: 0,
                         name: args.name.clone(),
-                        description: args.description.clone(),
                     };
                     let result = db::put_node(&cmd.db, &mut node);
                     info!("Result: {:?}", result);
@@ -244,7 +241,6 @@ pub fn go(cmd: &Command) {
                     head: args.head,
                     tail: args.tail,
                     name: args.name.clone(),
-                    description: args.description.clone(),
                 };
                 let result = db::put_edge(&cmd.db, &mut edge);
                 info!("Result: {:?}", result);

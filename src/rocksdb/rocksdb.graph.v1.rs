@@ -5,8 +5,6 @@ pub struct Node {
     pub id: u64,
     #[prost(string, tag = "2")]
     pub name: ::prost::alloc::string::String,
-    #[prost(string, optional, tag = "3")]
-    pub description: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -19,6 +17,4 @@ pub struct Edge {
     pub tail: u64,
     #[prost(string, tag = "4")]
     pub name: ::prost::alloc::string::String,
-    #[prost(string, optional, tag = "5")]
-    pub description: ::core::option::Option<::prost::alloc::string::String>,
 }

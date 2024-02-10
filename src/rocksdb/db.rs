@@ -1,9 +1,12 @@
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
+use crate::rocksdb::edge;
 use crate::rocksdb::graph::{Edge, Node};
-use crate::rocksdb::index;
 use crate::rocksdb::index::{Index, Indexes};
+use crate::rocksdb::kv;
+use crate::rocksdb::node;
+use crate::rocksdb::All;
 
 use prost::Message; // need the trait to encode protobuf
 use rocksdb::{DBWithThreadMode, Direction, IteratorMode, Options, SingleThreaded, DB};
@@ -144,7 +147,7 @@ fn open_db(
         Ok(db) => Ok(db),
         Err(e) => {
             error!("error::Error opening db: {:?}", e);
-            return Err(Box::new(e));
+            Err(Box::new(e))
         }
     }
 }
@@ -190,12 +193,12 @@ pub fn put_node<'a>(
 ) -> Result<&'a Node, Box<dyn error::Error>> {
     trace!("node: {:?}", node);
 
-    let mut db = open_db(info, &index::All)?;
+    let mut db = open_db(info, &All)?;
     let id = next_id(&db)?;
     node.id = id;
 
-    // let cf = db.cf_handle(index::NodeById.cf_name()).unwrap();
-    // let kv = index::NodeById.key_value(node);
+    // let cf = db.cf_handle(node::ById.cf_name()).unwrap();
+    // let kv = node::ById.key_value(node);
     // db.put_cf(cf, kv.0, kv.1)?;
 
     let mut txn = Transaction::default();
@@ -211,9 +214,9 @@ pub fn put_node<'a>(
 pub fn get_node(info: &dyn DbInfo, id: u64) -> Result<Option<Node>, Box<dyn error::Error>> {
     trace!("db: {:?}, node id: {:?}", info.path(), id);
 
-    let db = open_db(info, &index::All)?;
+    let db = open_db(info, &All)?;
 
-    let cf = db.cf_handle(index::NodeById.cf_name()).unwrap();
+    let cf = db.cf_handle(node::ById.cf_name()).unwrap();
     match db.get_cf(cf, u64::to_le_bytes(id)) {
         Ok(Some(bytes)) => {
             trace!("Found node with id = {:?} found {:?}", id, bytes);
@@ -237,12 +240,12 @@ pub fn put_edge<'a>(
 ) -> Result<&'a Edge, Box<dyn error::Error>> {
     trace!("edge: {:?}", edge);
 
-    let mut db = open_db(info, &index::All)?;
+    let mut db = open_db(info, &All)?;
     let id = next_id(&db)?;
     edge.id = id;
 
-    // let cf = db.cf_handle(index::EdgeById.cf_name()).unwrap();
-    // let kv = index::EdgeById.key_value(edge);
+    // let cf = db.cf_handle(node::ById.cf_name()).unwrap();
+    // let kv = node::ById.key_value(edge);
     // db.put_cf(cf, kv.0, kv.1)?;
 
     let mut txn = Transaction::default();
@@ -259,9 +262,9 @@ pub fn put_edge<'a>(
 pub fn get_edge(info: &dyn DbInfo, id: u64) -> Result<Option<Edge>, Box<dyn error::Error>> {
     trace!("db: {:?}, edge id: {:?}", info.path(), id);
 
-    let db = open_db(info, &index::All)?;
+    let db = open_db(info, &All)?;
 
-    let cf = db.cf_handle(index::EdgeById.cf_name()).unwrap();
+    let cf = db.cf_handle(edge::ById.cf_name()).unwrap();
     match db.get_cf(cf, u64::to_le_bytes(id)) {
         Ok(Some(bytes)) => {
             trace!("Found edge with id = {:?} found {:?}", id, bytes);
@@ -282,7 +285,7 @@ pub fn get_edge(info: &dyn DbInfo, id: u64) -> Result<Option<Edge>, Box<dyn erro
 pub fn indexes(info: &dyn DbInfo) -> Result<Vec<String>, Box<dyn error::Error>> {
     trace!("Indexes path={}", info.path());
 
-    let db = open_db(info, &index::All)?;
+    let db = open_db(info, &All)?;
     trace!("DB = {:?}", db);
 
     //    let cfs = DB::list_cf(&options, p).unwrap_or(vec![]);
@@ -300,11 +303,11 @@ pub fn indexes(info: &dyn DbInfo) -> Result<Vec<String>, Box<dyn error::Error>> 
 pub fn put(info: &dyn DbInfo, key: &str, value: &str) -> Result<(), Box<dyn error::Error>> {
     trace!("Put path={}, key={}, value={}", info.path(), key, value);
 
-    let db = open_db(info, &index::All)?;
+    let db = open_db(info, &All)?;
     trace!("DB = {:?}", db);
 
-    let cf = db.cf_handle(index::StringKV.cf_name()).unwrap();
-    let kv = index::StringKV.key_value(&(key.to_string(), value.to_string()));
+    let cf = db.cf_handle(kv::StringKV.cf_name()).unwrap();
+    let kv = kv::StringKV.key_value(&(key.to_string(), value.to_string()));
     match db.put_cf(cf, kv.0, kv.1) {
         Ok(()) => Ok(()),
         Err(e) => {
@@ -321,10 +324,10 @@ pub fn get(
 ) -> Result<Option<String>, Box<dyn error::Error>> {
     trace!("Get path={}, key={}", info.path(), key);
 
-    let db = open_db(info, &index::All)?;
+    let db = open_db(info, &All)?;
     trace!("DB = {:?}", db);
 
-    let cf = db.cf_handle(index::StringKV.cf_name()).unwrap();
+    let cf = db.cf_handle(kv::StringKV.cf_name()).unwrap();
     match db.get_cf(cf, key.as_bytes()) {
         Ok(Some(v)) => {
             let result = String::from_utf8(v).unwrap();
@@ -347,10 +350,10 @@ pub fn get(
 
 pub fn delete(info: &dyn DbInfo, key: &str) -> Result<(), Box<dyn error::Error>> {
     trace!("Delete path={}, key={}", info.path(), key);
-    let db = open_db(info, &index::All)?;
+    let db = open_db(info, &All)?;
     trace!("DB = {:?}", db);
 
-    let cf = db.cf_handle(index::StringKV.cf_name()).unwrap();
+    let cf = db.cf_handle(kv::StringKV.cf_name()).unwrap();
     match db.delete_cf(cf, key.as_bytes()) {
         Ok(()) => Ok(()),
         Err(e) => {
@@ -366,10 +369,10 @@ pub fn list(
     visitor: &dyn VisitKV,
 ) -> Result<(), Box<dyn error::Error>> {
     trace!("List path={}, key={}", info.path(), key);
-    let db = open_db(info, &index::All)?;
+    let db = open_db(info, &All)?;
     trace!("DB = {:?}", db);
 
-    let cf = db.cf_handle(index::StringKV.cf_name()).unwrap();
+    let cf = db.cf_handle(kv::StringKV.cf_name()).unwrap();
     let iter = db.iterator_cf(cf, IteratorMode::From(key.as_bytes(), Direction::Forward));
     for item in iter {
         let (k, v) = item.unwrap();
