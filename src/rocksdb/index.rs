@@ -10,6 +10,8 @@ pub trait Indexes<E: db::Entity> {
     fn indexes() -> Vec<Box<dyn Index<E>>>;
 }
 
+pub trait Queries<E: db::Entity> {}
+
 #[derive(Debug, Clone)]
 struct ErrMissingIndex {
     cf_name: String,

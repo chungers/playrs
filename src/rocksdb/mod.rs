@@ -24,8 +24,8 @@ impl db::IndexBuilder for All {
             kv::StringKV.cf_name().into(),
             node::ById.cf_name().into(),
             edge::ById.cf_name().into(),
-            node::ByName.cf_name().into(),
-            edge::ByName.cf_name().into(),
+            node::ByType.cf_name().into(),
+            edge::ByType.cf_name().into(),
             edge::ByHeadTail.cf_name().into(),
         ]
     }

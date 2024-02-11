@@ -5,7 +5,9 @@ use prost::Message; // need the trait to encode protobuf
 
 use crate::rocksdb::db;
 use crate::rocksdb::graph::Node;
-use crate::rocksdb::index::{Index, Indexes};
+use crate::rocksdb::index::{Index, Indexes, Queries};
+
+use std::error::Error;
 
 impl db::Entity for Node {
     fn key(&self) -> Vec<u8> {
@@ -16,13 +18,33 @@ impl db::Entity for Node {
     }
 }
 
+struct Operations {
+    db: db::Database,
+}
+
+pub fn operations(db: db::Database) -> Box<dyn db::Operations<Node>> {
+    return Box::new(Operations { db: db });
+}
+
+impl db::Operations<Node> for Operations {
+    fn get(&self, id: u64) -> Result<Option<Node>, Box<dyn Error>> {
+        Ok(None)
+    }
+    fn put(&self, e: &Node) -> Result<u64, Box<dyn Error>> {
+        Ok(1u64)
+    }
+    fn delete(&self, e: &Node) -> Result<bool, Box<dyn Error>> {
+        Ok(true)
+    }
+}
+
 impl Indexes<Node> for Node {
     fn indexes() -> Vec<Box<dyn Index<Node>>> {
         return vec![
             // By Id,
             Box::new(ById),
-            // By name
-            Box::new(ByName),
+            // By type code
+            Box::new(ByType),
         ];
     }
 }
@@ -37,7 +59,7 @@ impl std::fmt::Debug for dyn Index<Node> {
 pub struct ById;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ByName;
+pub struct ByType;
 
 impl Index<Node> for ById {
     fn cf_name(&self) -> &'static str {
@@ -45,12 +67,15 @@ impl Index<Node> for ById {
     }
 }
 
-impl Index<Node> for ByName {
+impl Index<Node> for ByType {
     fn cf_name(&self) -> &'static str {
-        return "index.node.name";
+        return "index.node.type";
     }
     fn key_value(&self, n: &Node) -> (Vec<u8>, Vec<u8>) {
-        return (n.name.as_bytes().to_vec(), n.id.to_le_bytes().to_vec());
+        return (
+            n.type_code.to_le_bytes().to_vec(),
+            n.id.to_le_bytes().to_vec(),
+        );
     }
 }
 
@@ -69,9 +94,10 @@ fn test_using_node_indexes() {
     println!("cf = {:?}", ById.cf_name());
     println!(
         "kv = {:?}",
-        ByName.key_value(&Node {
+        ByType.key_value(&Node {
             id: 1u64,
-            name: "foo".into(),
+            type_name: "foo".into(),
+            type_code: 2u64,
         })
     );
 }

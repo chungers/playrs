@@ -20,8 +20,9 @@ impl Indexes<Edge> for Edge {
     fn indexes() -> Vec<Box<dyn Index<Edge>>> {
         return vec![
             // By Id,
-            Box::new(ById), // By name
-            Box::new(ByName),
+            Box::new(ById),
+            // By type code
+            Box::new(ByType),
             // By head, tail
             Box::new(ByHeadTail),
         ];
@@ -32,7 +33,7 @@ impl Indexes<Edge> for Edge {
 pub struct ById;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ByName;
+pub struct ByType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ByHeadTail;
@@ -50,12 +51,15 @@ impl Index<Edge> for ById {
     // default of key_value encodes the full Edge blob as value
 }
 
-impl Index<Edge> for ByName {
+impl Index<Edge> for ByType {
     fn cf_name(&self) -> &'static str {
-        return "index.edge.name";
+        return "index.edge.type";
     }
     fn key_value(&self, e: &Edge) -> (Vec<u8>, Vec<u8>) {
-        return (e.name.as_bytes().to_vec(), e.id.to_le_bytes().to_vec());
+        return (
+            e.type_code.to_le_bytes().to_vec(),
+            e.id.to_le_bytes().to_vec(),
+        );
     }
 }
 
@@ -85,11 +89,12 @@ fn test_using_edge_indexes() {
     println!("cf = {:?}", ById.cf_name());
     println!(
         "kv = {:?}",
-        ByName.key_value(&Edge {
+        ByType.key_value(&Edge {
             id: 3u64,
             head: 1u64,
             tail: 2u64,
-            name: "foo".into(),
+            type_name: "foo".into(),
+            type_code: 3u64,
         })
     );
 }
