@@ -1,3 +1,6 @@
+#[allow(unused_imports)]
+use tracing::{debug, error, info, trace, warn};
+
 use clap::{Args as clapArgs, Subcommand};
 
 use std::path::PathBuf;
@@ -8,14 +11,11 @@ use std::vec::Vec;
 use crate::duckdb::db;
 use crate::duckdb::Person;
 
-#[allow(unused_imports)]
-use tracing::{debug, error, info, trace, warn};
-
 #[derive(Debug, clapArgs)]
 #[clap(args_conflicts_with_subcommands = false)]
 pub struct Command {
     /// Path of the db file
-    #[clap(short = 'p')]
+    #[clap(long = "path", short = 'p')]
     pub path: PathBuf,
 
     #[clap(subcommand)]

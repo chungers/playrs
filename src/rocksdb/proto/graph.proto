@@ -4,12 +4,21 @@ package rocksdb.graph.v1;
 
 message Node {
     uint64 id = 1;
-    string name = 2;
+    uint64 type_code = 2;
+    string type_name = 3;
 }
 
 message Edge {
     uint64 id = 1;
-    uint64 head = 2;
-    uint64 tail = 3;
-    string name = 4;
+    uint64 type_code = 2;
+    string type_name = 3;
+    uint64 head = 4;
+    uint64 tail = 5;
+}
+
+message Document {
+    uint64 id = 1;
+    map<string, string> metadata = 2;
+    string content_type = 3;
+    bytes content = 4;
 }

@@ -8,6 +8,8 @@ use crate::rocksdb::All;
 use clap::{Args as clapArgs, Subcommand};
 use rocksdb::Options;
 
+use std::path::PathBuf;
+
 #[derive(Debug, clapArgs, PartialEq, Eq)]
 pub struct DbArgs {
     /// The DB path
@@ -45,16 +47,20 @@ impl std::str::FromStr for DbArgs {
 }
 
 #[derive(Debug, clapArgs)]
-#[clap(args_conflicts_with_subcommands = true)]
+#[clap(args_conflicts_with_subcommands = false)]
 pub struct Command {
+    /// Path of the db file. TODO(future - full db spec with config params)
+    #[clap(long = "path", short = 'p')]
+    pub db: DbArgs,
+
     #[clap(subcommand)]
     pub verb: Verb,
 }
 
 #[derive(Debug, Subcommand)]
 pub enum Verb {
-    Init(DbArgs),
-    Indexes(DbArgs),
+    Init(InitArgs),
+    Indexes(IndexesArgs),
     Put(PutArgs),
     Get(GetArgs),
     Delete(DeleteArgs),
@@ -64,10 +70,13 @@ pub enum Verb {
 }
 
 #[derive(Debug, clapArgs)]
-pub struct PutArgs {
-    /// The DB path
-    db: DbArgs,
+pub struct InitArgs {}
 
+#[derive(Debug, clapArgs)]
+pub struct IndexesArgs {}
+
+#[derive(Debug, clapArgs)]
+pub struct PutArgs {
     /// The key
     key: String,
 
@@ -77,33 +86,24 @@ pub struct PutArgs {
 
 #[derive(Debug, clapArgs)]
 pub struct GetArgs {
-    /// The DB path
-    db: DbArgs,
-
     /// The key
     key: String,
 }
 
 #[derive(Debug, clapArgs)]
 pub struct DeleteArgs {
-    /// The DB path
-    db: DbArgs,
     /// The key
     key: String,
 }
 
 #[derive(Debug, clapArgs)]
 pub struct ListArgs {
-    /// The DB path
-    db: DbArgs,
     /// The key
     prefix: String,
 }
 
 #[derive(Debug, clapArgs)]
 pub struct NodeCommand {
-    /// The DB path
-    db: DbArgs,
     #[clap(subcommand)]
     verb: NodeVerb,
 }
@@ -130,8 +130,6 @@ pub struct NodeGetArgs {
 
 #[derive(Debug, clapArgs)]
 pub struct EdgeCommand {
-    /// The DB path
-    db: DbArgs,
     #[clap(subcommand)]
     verb: EdgeVerb,
 }
@@ -177,42 +175,43 @@ pub fn go(cmd: &Command) {
     match &cmd.verb {
         Verb::Init(args) => {
             trace!("Called start: {:?}", args);
-            let result = db::init(args, &All);
+            let result = db::init(&cmd.db, &All);
             trace!("Result: {:?}", result);
         }
         Verb::Indexes(args) => {
             trace!("List Indexes (column families): {:?}", args);
-            let result = db::indexes(args);
+            let result = db::indexes(&cmd.db);
             trace!("Result: {:?}", result);
             println!("{:?}", result);
         }
         Verb::Put(args) => {
             trace!("Called put: {:?}", args);
-            let result = db::put(&args.db, &args.key, &args.value);
+            let result = db::put(&cmd.db, &args.key, &args.value);
             trace!("Result: {:?}", result);
         }
         Verb::Get(args) => {
             trace!("Called get: {:?}", args);
-            let result = db::get(&args.db, &args.key, &visit);
+            let result = db::get(&cmd.db, &args.key, &visit);
             trace!("Result: {:?}", result);
         }
         Verb::Delete(args) => {
             trace!("Called delete: {:?}", args);
-            let result = db::delete(&args.db, &args.key);
+            let result = db::delete(&cmd.db, &args.key);
             trace!("Result: {:?}", result);
         }
         Verb::List(args) => {
             trace!("Called list: {:?}", args);
-            let result = db::list(&args.db, &args.prefix, &visit);
+            let result = db::list(&cmd.db, &args.prefix, &visit);
             trace!("Result: {:?}", result);
         }
-        Verb::Node(cmd) => {
+        Verb::Node(ncmd) => {
             trace!("Called node: {:?}", cmd);
-            match &cmd.verb {
+            match &ncmd.verb {
                 NodeVerb::Put(args) => {
                     let mut node = Node {
                         id: 0,
-                        name: args.name.clone(),
+                        type_name: args.name.clone(),
+                        type_code: 0,
                     };
                     let result = db::put_node(&cmd.db, &mut node);
                     info!("Result: {:?}", result);
@@ -234,13 +233,14 @@ pub fn go(cmd: &Command) {
                 }
             }
         }
-        Verb::Edge(cmd) => match &cmd.verb {
+        Verb::Edge(ncmd) => match &ncmd.verb {
             EdgeVerb::Put(args) => {
                 let mut edge = Edge {
                     id: 0,
                     head: args.head,
                     tail: args.tail,
-                    name: args.name.clone(),
+                    type_name: args.name.clone(),
+                    type_code: 0,
                 };
                 let result = db::put_edge(&cmd.db, &mut edge);
                 info!("Result: {:?}", result);
