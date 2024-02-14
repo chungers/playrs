@@ -95,6 +95,8 @@ fn test_using_edge_indexes() {
             tail: 2u64,
             type_name: "foo".into(),
             type_code: 3u64,
+            name: "foo".into(),
+            doc: vec![],
         })
     );
 }

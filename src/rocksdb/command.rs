@@ -8,8 +8,6 @@ use crate::rocksdb::All;
 use clap::{Args as clapArgs, Subcommand};
 use rocksdb::Options;
 
-use std::path::PathBuf;
-
 #[derive(Debug, clapArgs, PartialEq, Eq)]
 pub struct DbArgs {
     /// The DB path
@@ -212,6 +210,8 @@ pub fn go(cmd: &Command) {
                         id: 0,
                         type_name: args.name.clone(),
                         type_code: 0,
+                        name: args.name.clone(),
+                        doc: vec![],
                     };
                     let result = db::put_node(&cmd.db, &mut node);
                     info!("Result: {:?}", result);
@@ -241,6 +241,8 @@ pub fn go(cmd: &Command) {
                     tail: args.tail,
                     type_name: args.name.clone(),
                     type_code: 0,
+                    name: args.name.clone(),
+                    doc: vec![],
                 };
                 let result = db::put_edge(&cmd.db, &mut edge);
                 info!("Result: {:?}", result);

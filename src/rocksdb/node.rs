@@ -98,6 +98,8 @@ fn test_using_node_indexes() {
             id: 1u64,
             type_name: "foo".into(),
             type_code: 2u64,
+            name: "foo".into(),
+            doc: vec![],
         })
     );
 }
