@@ -41,8 +41,12 @@ pub trait Entity {
 
 pub trait Operations<E: Entity> {
     fn get(&self, id: u64) -> Result<Option<E>, Box<dyn Error>>;
-    fn put(&self, e: &E) -> Result<u64, Box<dyn Error>>;
+    fn put(&mut self, e: &mut E) -> Result<u64, Box<dyn Error>>;
     fn delete(&self, e: &E) -> Result<bool, Box<dyn Error>>;
+}
+
+pub trait OperationsBuilder<E: Entity> {
+    fn operations<'a>(db: &Database) -> Box<dyn Operations<E> + '_>;
 }
 
 #[derive(Debug, Clone)]
@@ -118,7 +122,7 @@ fn all_column_families(builder: &dyn IndexBuilder) -> Vec<String> {
     return indexes;
 }
 
-pub fn init(info: &dyn DbInfo, builder: &dyn IndexBuilder) -> Result<(), Box<dyn Error>> {
+pub fn init(info: &dyn DbInfo, builder: &dyn IndexBuilder) -> Result<Database, Box<dyn Error>> {
     let path = info.path();
     let options = info.options();
     trace!("Init path={:?}", path);
@@ -141,12 +145,12 @@ pub fn init(info: &dyn DbInfo, builder: &dyn IndexBuilder) -> Result<(), Box<dyn
         }
     }
 
-    Ok(())
+    Ok(db)
 }
 
 // TODO - Optimize this a bit more so that opening the database simply
 // opens all the column families, without creating them (do that in "init").
-fn open_db(info: &dyn DbInfo, builder: &dyn IndexBuilder) -> Result<Database, Box<dyn Error>> {
+pub fn open_db(info: &dyn DbInfo, builder: &dyn IndexBuilder) -> Result<Database, Box<dyn Error>> {
     trace!("open_db path={}", info.path());
     let options = info.options();
     match DB::open_cf(
@@ -164,7 +168,7 @@ fn open_db(info: &dyn DbInfo, builder: &dyn IndexBuilder) -> Result<Database, Bo
 
 // Returns the type code by checking a global lookup table of names;
 // creates new entry if name is not found.
-fn type_code(db: &Database, name: &String) -> Result<u64, Box<dyn Error>> {
+pub fn type_code(db: &Database, name: &String) -> Result<u64, Box<dyn Error>> {
     let type_code: u64;
     let cf = db.cf_handle(CF_SYSTEM_TYPES).unwrap();
     match db.get_cf(cf, name.as_bytes()) {
@@ -194,7 +198,7 @@ fn type_code(db: &Database, name: &String) -> Result<u64, Box<dyn Error>> {
     }
 }
 
-fn next_id(db: &Database) -> Result<u64, Box<dyn Error>> {
+pub fn next_id(db: &Database) -> Result<u64, Box<dyn Error>> {
     trace!("DB = {:?}", db);
 
     let id: u64;
@@ -224,49 +228,6 @@ fn next_id(db: &Database) -> Result<u64, Box<dyn Error>> {
         Ok(()) => Ok(id),
         Err(e) => {
             error!("Error updating sequence {}", SEQ_KEY);
-            Err(Box::new(e))
-        }
-    }
-}
-
-pub fn put_node<'a>(info: &'a dyn DbInfo, node: &'a mut Node) -> Result<&'a Node, Box<dyn Error>> {
-    trace!("node: {:?}", node);
-    let mut db = open_db(info, &All)?;
-    node.id = next_id(&db)?;
-    node.type_code = type_code(&db, &node.type_name)?;
-
-    // let cf = db.cf_handle(node::ById.cf_name()).unwrap();
-    // let kv = node::ById.key_value(node);
-    // db.put_cf(cf, kv.0, kv.1)?;
-
-    let mut txn = Transaction::default();
-    let _: Vec<_> = Node::indexes()
-        .iter()
-        .map(|index| index.update_entry(&mut db, &mut txn, &node))
-        .collect();
-
-    db.write(txn)?;
-    Ok(node)
-}
-
-pub fn get_node(info: &dyn DbInfo, id: u64) -> Result<Option<Node>, Box<dyn Error>> {
-    trace!("db: {:?}, node id: {:?}", info.path(), id);
-
-    let db = open_db(info, &All)?;
-
-    let cf = db.cf_handle(node::ById.cf_name()).unwrap();
-    match db.get_cf(cf, u64::to_le_bytes(id)) {
-        Ok(Some(bytes)) => {
-            trace!("Found node with id = {:?} found {:?}", id, bytes);
-            let decoded: Node = Message::decode(&bytes[..])?;
-            Ok(Some(decoded))
-        }
-        Ok(None) => {
-            trace!("No node with id = {:?} found", id);
-            Ok(None)
-        }
-        Err(e) => {
-            error!("Error: {:?}", e);
             Err(Box::new(e))
         }
     }
