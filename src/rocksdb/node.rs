@@ -18,22 +18,50 @@ impl db::Entity for Node {
     }
 }
 
-struct Operations {
-    db: db::Database,
+struct Operations<'a> {
+    db: &'a db::Database,
 }
 
-pub fn operations(db: db::Database) -> Box<dyn db::Operations<Node>> {
-    return Box::new(Operations { db: db });
+impl db::OperationsBuilder<Node> for Node {
+    fn operations<'a>(db: &db::Database) -> Box<dyn db::Operations<Node> + '_> {
+        return Box::new(Operations { db: db });
+    }
 }
 
-impl db::Operations<Node> for Operations {
+impl db::Operations<Node> for Operations<'_> {
     fn get(&self, id: u64) -> Result<Option<Node>, Box<dyn Error>> {
-        Ok(None)
+        let cf = self.db.cf_handle(ById.cf_name()).unwrap();
+        match self.db.get_cf(cf, u64::to_le_bytes(id)) {
+            Ok(Some(bytes)) => {
+                trace!("Found node with id = {:?} found {:?}", id, bytes);
+                let decoded: Node = Message::decode(&bytes[..])?;
+                Ok(Some(decoded))
+            }
+            Ok(None) => {
+                trace!("No node with id = {:?} found", id);
+                Ok(None)
+            }
+            Err(e) => {
+                error!("Error: {:?}", e);
+                Err(Box::new(e))
+            }
+        }
     }
-    fn put(&self, e: &Node) -> Result<u64, Box<dyn Error>> {
-        Ok(1u64)
+    fn put(&mut self, node: &mut Node) -> Result<u64, Box<dyn Error>> {
+        node.id = db::next_id(self.db)?;
+        node.type_code = db::type_code(self.db, &node.type_name)?;
+
+        let mut txn = db::Transaction::default();
+        let _: Vec<_> = Node::indexes()
+            .iter()
+            .map(|index| index.update_entry(self.db, &mut txn, &node))
+            .collect();
+
+        self.db.write(txn)?;
+
+        Ok(node.id)
     }
-    fn delete(&self, e: &Node) -> Result<bool, Box<dyn Error>> {
+    fn delete(&self, node: &Node) -> Result<bool, Box<dyn Error>> {
         Ok(true)
     }
 }
@@ -103,3 +131,6 @@ fn test_using_node_indexes() {
         })
     );
 }
+
+#[test]
+fn test_using_node_operations() {}

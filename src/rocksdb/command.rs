@@ -5,6 +5,8 @@ use crate::rocksdb::db;
 use crate::rocksdb::graph::{Edge, Node};
 use crate::rocksdb::All;
 
+use crate::rocksdb::db::OperationsBuilder;
+
 use clap::{Args as clapArgs, Subcommand};
 use rocksdb::Options;
 
@@ -213,11 +215,18 @@ pub fn go(cmd: &Command) {
                         name: args.name.clone(),
                         doc: vec![],
                     };
-                    let result = db::put_node(&cmd.db, &mut node);
+
+                    let database = db::open_db(&cmd.db, &All).unwrap();
+                    let mut ops = Node::operations(&database);
+                    let result = ops.put(&mut node);
+
                     info!("Result: {:?}", result);
                 }
                 NodeVerb::Get(args) => {
-                    let result = db::get_node(&cmd.db, args.id);
+                    let database = db::open_db(&cmd.db, &All).unwrap();
+                    let mut ops = Node::operations(&database);
+                    let result = ops.get(args.id);
+
                     trace!("Result: {:?}", result);
                     match result {
                         Ok(Some(node)) => {

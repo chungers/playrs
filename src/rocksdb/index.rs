@@ -36,7 +36,7 @@ pub trait Index<E: db::Entity + std::fmt::Debug> {
 
     fn update_entry(
         &self,
-        db: &mut db::Database,
+        db: &db::Database,
         txn: &mut db::Transaction,
         e: &E,
     ) -> Result<(), Box<dyn Error>> {
