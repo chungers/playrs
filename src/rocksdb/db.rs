@@ -1,14 +1,10 @@
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-use crate::rocksdb::edge;
-use crate::rocksdb::graph::{Edge, Node};
-use crate::rocksdb::index::{Index, Indexes};
+use crate::rocksdb::index::Index;
 use crate::rocksdb::kv;
-use crate::rocksdb::node;
 use crate::rocksdb::All;
 
-use prost::Message; // need the trait to encode protobuf
 use rocksdb::{
     DBWithThreadMode, Direction, IteratorMode, Options, SingleThreaded, WriteBatchWithTransaction,
     DB,
@@ -233,55 +229,11 @@ pub fn next_id(db: &Database) -> Result<u64, Box<dyn Error>> {
     }
 }
 
-pub fn put_edge<'a>(info: &'a dyn DbInfo, edge: &'a mut Edge) -> Result<&'a Edge, Box<dyn Error>> {
-    trace!("edge: {:?}", edge);
-
-    let mut db = open_db(info, &All)?;
-
-    edge.id = next_id(&db)?;
-    edge.type_code = type_code(&db, &edge.type_name)?;
-
-    let mut txn = Transaction::default();
-    let _: Vec<_> = Edge::indexes()
-        .iter()
-        .map(|index| index.update_entry(&mut db, &mut txn, &edge))
-        .collect();
-
-    db.write(txn)?;
-    Ok(edge)
-}
-
-#[allow(dead_code)]
-pub fn get_edge(info: &dyn DbInfo, id: u64) -> Result<Option<Edge>, Box<dyn Error>> {
-    trace!("db: {:?}, edge id: {:?}", info.path(), id);
-
-    let db = open_db(info, &All)?;
-
-    let cf = db.cf_handle(edge::ById.cf_name()).unwrap();
-    match db.get_cf(cf, u64::to_le_bytes(id)) {
-        Ok(Some(bytes)) => {
-            trace!("Found edge with id = {:?} found {:?}", id, bytes);
-            let decoded: Edge = Message::decode(&bytes[..])?;
-            Ok(Some(decoded))
-        }
-        Ok(None) => {
-            trace!("No edge with id = {:?} found", id);
-            Ok(None)
-        }
-        Err(e) => {
-            error!("Error: {:?}", e);
-            Err(Box::new(e))
-        }
-    }
-}
-
 pub fn indexes(info: &dyn DbInfo) -> Result<Vec<String>, Box<dyn Error>> {
     trace!("Indexes path={}", info.path());
 
     let db = open_db(info, &All)?;
     trace!("DB = {:?}", db);
-
-    //    let cfs = DB::list_cf(&options, p).unwrap_or(vec![]);
 
     let options = Options::default();
     match DB::list_cf(&options, info.path()) {

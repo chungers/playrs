@@ -33,12 +33,12 @@ impl db::Operations<Node> for Operations<'_> {
         let cf = self.db.cf_handle(ById.cf_name()).unwrap();
         match self.db.get_cf(cf, u64::to_le_bytes(id)) {
             Ok(Some(bytes)) => {
-                trace!("Found node with id = {:?} found {:?}", id, bytes);
+                trace!("Found node id = {:?} found {:?}", id, bytes);
                 let decoded: Node = Message::decode(&bytes[..])?;
                 Ok(Some(decoded))
             }
             Ok(None) => {
-                trace!("No node with id = {:?} found", id);
+                trace!("No node id = {:?} found", id);
                 Ok(None)
             }
             Err(e) => {
@@ -62,6 +62,7 @@ impl db::Operations<Node> for Operations<'_> {
         Ok(node.id)
     }
     fn delete(&self, node: &Node) -> Result<bool, Box<dyn Error>> {
+        trace!("Deleting {:?}", node);
         Ok(true)
     }
 }

@@ -172,6 +172,8 @@ pub fn go(cmd: &Command) {
     trace!("Running command: {:?}", cmd);
     let visit = Visitor(0);
 
+    let database = db::open_db(&cmd.db, &All).unwrap();
+
     match &cmd.verb {
         Verb::Init(args) => {
             trace!("Called start: {:?}", args);
@@ -180,6 +182,10 @@ pub fn go(cmd: &Command) {
         }
         Verb::Indexes(args) => {
             trace!("List Indexes (column families): {:?}", args);
+
+            let options = Options::default();
+            //            let result = database.list_cf(&options, cmd.db.path());
+
             let result = db::indexes(&cmd.db);
             trace!("Result: {:?}", result);
             println!("{:?}", result);
@@ -216,15 +222,13 @@ pub fn go(cmd: &Command) {
                         doc: vec![],
                     };
 
-                    let database = db::open_db(&cmd.db, &All).unwrap();
                     let mut ops = Node::operations(&database);
                     let result = ops.put(&mut node);
 
                     info!("Result: {:?}", result);
                 }
                 NodeVerb::Get(args) => {
-                    let database = db::open_db(&cmd.db, &All).unwrap();
-                    let mut ops = Node::operations(&database);
+                    let ops = Node::operations(&database);
                     let result = ops.get(args.id);
 
                     trace!("Result: {:?}", result);
@@ -253,11 +257,16 @@ pub fn go(cmd: &Command) {
                     name: args.name.clone(),
                     doc: vec![],
                 };
-                let result = db::put_edge(&cmd.db, &mut edge);
+
+                let mut ops = Edge::operations(&database);
+                let result = ops.put(&mut edge);
+
                 info!("Result: {:?}", result);
             }
             EdgeVerb::Get(args) => {
-                let result = db::get_edge(&cmd.db, args.id);
+                let ops = Edge::operations(&database);
+                let result = ops.get(args.id);
+
                 trace!("Result: {:?}", result);
                 match result {
                     Ok(Some(edge)) => {
