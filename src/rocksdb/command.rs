@@ -61,10 +61,7 @@ pub struct Command {
 pub enum Verb {
     Init(InitArgs),
     Indexes(IndexesArgs),
-    Put(PutArgs),
-    Get(GetArgs),
-    Delete(DeleteArgs),
-    List(ListArgs),
+    Kv(KvCommand),
     Node(NodeCommand),
     Edge(EdgeCommand),
 }
@@ -76,7 +73,21 @@ pub struct InitArgs {}
 pub struct IndexesArgs {}
 
 #[derive(Debug, clapArgs)]
-pub struct PutArgs {
+pub struct KvCommand {
+    #[clap(subcommand)]
+    verb: KvVerb,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum KvVerb {
+    Put(KvPutArgs),
+    Get(KvGetArgs),
+    Delete(KvDeleteArgs),
+    List(KvListArgs),
+}
+
+#[derive(Debug, clapArgs)]
+pub struct KvPutArgs {
     /// The key
     key: String,
 
@@ -85,19 +96,19 @@ pub struct PutArgs {
 }
 
 #[derive(Debug, clapArgs)]
-pub struct GetArgs {
+pub struct KvGetArgs {
     /// The key
     key: String,
 }
 
 #[derive(Debug, clapArgs)]
-pub struct DeleteArgs {
+pub struct KvDeleteArgs {
     /// The key
     key: String,
 }
 
 #[derive(Debug, clapArgs)]
-pub struct ListArgs {
+pub struct KvListArgs {
     /// The key
     prefix: String,
 }
@@ -172,8 +183,6 @@ pub fn go(cmd: &Command) {
     trace!("Running command: {:?}", cmd);
     let visit = Visitor(0);
 
-    let database = db::open_db(&cmd.db, &All).unwrap();
-
     match &cmd.verb {
         Verb::Init(args) => {
             trace!("Called start: {:?}", args);
@@ -182,36 +191,43 @@ pub fn go(cmd: &Command) {
         }
         Verb::Indexes(args) => {
             trace!("List Indexes (column families): {:?}", args);
-
-            let options = Options::default();
-            //            let result = database.list_cf(&options, cmd.db.path());
-
             let result = db::indexes(&cmd.db);
             trace!("Result: {:?}", result);
             println!("{:?}", result);
         }
-        Verb::Put(args) => {
-            trace!("Called put: {:?}", args);
-            let result = db::put(&cmd.db, &args.key, &args.value);
-            trace!("Result: {:?}", result);
+
+        Verb::Kv(kvcmd) => {
+            trace!("Called kv: {:?}", kvcmd);
+            let database = db::open_db(&cmd.db, &All).unwrap();
+
+            match &kvcmd.verb {
+                KvVerb::Put(args) => {
+                    trace!("Called put: {:?}", args);
+                    let result = db::put(&cmd.db, &args.key, &args.value);
+                    trace!("Result: {:?}", result);
+                }
+                KvVerb::Get(args) => {
+                    trace!("Called get: {:?}", args);
+                    let result = db::get(&cmd.db, &args.key, &visit);
+                    trace!("Result: {:?}", result);
+                }
+                KvVerb::Delete(args) => {
+                    trace!("Called delete: {:?}", args);
+                    let result = db::delete(&cmd.db, &args.key);
+                    trace!("Result: {:?}", result);
+                }
+                KvVerb::List(args) => {
+                    trace!("Called list: {:?}", args);
+                    let result = db::list(&cmd.db, &args.prefix, &visit);
+                    trace!("Result: {:?}", result);
+                }
+            }
         }
-        Verb::Get(args) => {
-            trace!("Called get: {:?}", args);
-            let result = db::get(&cmd.db, &args.key, &visit);
-            trace!("Result: {:?}", result);
-        }
-        Verb::Delete(args) => {
-            trace!("Called delete: {:?}", args);
-            let result = db::delete(&cmd.db, &args.key);
-            trace!("Result: {:?}", result);
-        }
-        Verb::List(args) => {
-            trace!("Called list: {:?}", args);
-            let result = db::list(&cmd.db, &args.prefix, &visit);
-            trace!("Result: {:?}", result);
-        }
+
         Verb::Node(ncmd) => {
-            trace!("Called node: {:?}", cmd);
+            trace!("Called node: {:?}", ncmd);
+            let database = db::open_db(&cmd.db, &All).unwrap();
+
             match &ncmd.verb {
                 NodeVerb::Put(args) => {
                     let mut node = Node {
@@ -246,40 +262,43 @@ pub fn go(cmd: &Command) {
                 }
             }
         }
-        Verb::Edge(ncmd) => match &ncmd.verb {
-            EdgeVerb::Put(args) => {
-                let mut edge = Edge {
-                    id: 0,
-                    head: args.head,
-                    tail: args.tail,
-                    type_name: args.name.clone(),
-                    type_code: 0,
-                    name: args.name.clone(),
-                    doc: vec![],
-                };
+        Verb::Edge(ncmd) => {
+            trace!("Called edge: {:?}", cmd);
+            let database = db::open_db(&cmd.db, &All).unwrap();
+            match &ncmd.verb {
+                EdgeVerb::Put(args) => {
+                    let mut edge = Edge {
+                        id: 0,
+                        head: args.head,
+                        tail: args.tail,
+                        type_name: args.name.clone(),
+                        type_code: 0,
+                        name: args.name.clone(),
+                        doc: vec![],
+                    };
+                    let mut ops = Edge::operations(&database);
+                    let result = ops.put(&mut edge);
 
-                let mut ops = Edge::operations(&database);
-                let result = ops.put(&mut edge);
+                    info!("Result: {:?}", result);
+                }
+                EdgeVerb::Get(args) => {
+                    let ops = Edge::operations(&database);
+                    let result = ops.get(args.id);
 
-                info!("Result: {:?}", result);
-            }
-            EdgeVerb::Get(args) => {
-                let ops = Edge::operations(&database);
-                let result = ops.get(args.id);
-
-                trace!("Result: {:?}", result);
-                match result {
-                    Ok(Some(edge)) => {
-                        info!("{:?}", edge);
-                    }
-                    Ok(None) => {
-                        info!("not found");
-                    }
-                    Err(e) => {
-                        error!("Error: {:?}", e);
+                    trace!("Result: {:?}", result);
+                    match result {
+                        Ok(Some(edge)) => {
+                            info!("{:?}", edge);
+                        }
+                        Ok(None) => {
+                            info!("not found");
+                        }
+                        Err(e) => {
+                            error!("Error: {:?}", e);
+                        }
                     }
                 }
             }
-        },
+        }
     }
 }
