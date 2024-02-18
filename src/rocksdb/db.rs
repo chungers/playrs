@@ -6,8 +6,7 @@ use crate::rocksdb::kv;
 use crate::rocksdb::All;
 
 use rocksdb::{
-    DBWithThreadMode, Direction, IteratorMode, Options, SingleThreaded, WriteBatchWithTransaction,
-    DB,
+    DBWithThreadMode, Direction, IteratorMode, SingleThreaded, WriteBatchWithTransaction, DB,
 };
 use std::convert::TryInto;
 use std::error::Error;
@@ -229,14 +228,14 @@ pub fn next_id(db: &Database) -> Result<u64, Box<dyn Error>> {
     }
 }
 
-pub fn indexes(info: &dyn DbInfo) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn indexes(
+    info: &dyn DbInfo,
+    //    builder: &dyn IndexBuilder,
+) -> Result<Vec<String>, Box<dyn Error>> {
     trace!("Indexes path={}", info.path());
-
-    let db = open_db(info, &All)?;
-    trace!("DB = {:?}", db);
-
-    let options = Options::default();
-    match DB::list_cf(&options, info.path()) {
+    // let db = open_db(info, builder)?;
+    // trace!("DB = {:?}", db);
+    match DB::list_cf(&info.options(), info.path()) {
         Ok(l) => Ok(l),
         Err(e) => {
             error!("Error listing column families {:?}", e);
