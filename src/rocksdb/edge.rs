@@ -7,12 +7,65 @@ use crate::rocksdb::db;
 use crate::rocksdb::graph::Edge;
 use crate::rocksdb::index::{Index, Indexes};
 
+use std::error::Error;
+
 impl db::Entity for Edge {
     fn key(&self) -> Vec<u8> {
         return self.id.to_le_bytes().to_vec();
     }
     fn encode(&self) -> Vec<u8> {
         return self.encode_to_vec();
+    }
+}
+
+struct Operations<'a> {
+    db: &'a db::Database,
+}
+
+impl db::OperationsBuilder<Edge> for Edge {
+    fn operations<'a>(db: &db::Database) -> Box<dyn db::Operations<Edge> + '_> {
+        return Box::new(Operations { db: db });
+    }
+}
+
+impl db::Operations<Edge> for Operations<'_> {
+    fn get(&self, id: u64) -> Result<Option<Edge>, Box<dyn Error>> {
+        let cf = self.db.cf_handle(ById.cf_name()).unwrap();
+        match self.db.get_cf(cf, u64::to_le_bytes(id)) {
+            Ok(Some(bytes)) => {
+                trace!("Found edge id = {:?} found {:?}", id, bytes);
+                let decoded: Edge = Message::decode(&bytes[..])?;
+                Ok(Some(decoded))
+            }
+            Ok(None) => {
+                trace!("No edge id = {:?} found", id);
+                Ok(None)
+            }
+            Err(e) => {
+                error!("Error: {:?}", e);
+                Err(Box::new(e))
+            }
+        }
+    }
+
+    fn put(&mut self, edge: &mut Edge) -> Result<u64, Box<dyn Error>> {
+        edge.id = db::next_id(self.db)?;
+        edge.type_code = db::type_code(self.db, &edge.type_name)?;
+
+        let mut txn = db::Transaction::default();
+        let _: Vec<_> = Edge::indexes()
+            .iter()
+            .map(|index| index.update_entry(self.db, &mut txn, &edge))
+            .collect();
+
+        self.db.write(txn)?;
+
+        Ok(edge.id)
+    }
+
+    fn delete(&self, edge: &Edge) -> Result<bool, Box<dyn Error>> {
+        trace!("Deleting {:?}", edge);
+        Ok(true)
     }
 }
 
