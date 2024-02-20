@@ -34,14 +34,28 @@ pub trait Entity {
     fn encode(&self) -> Vec<u8>;
 }
 
-pub trait Operations<E: Entity> {
-    fn get(&self, id: u64) -> Result<Option<E>, Box<dyn Error>>;
-    fn put(&mut self, e: &mut E) -> Result<u64, Box<dyn Error>>;
+pub trait Key {
+    fn encode_key(&self) -> Vec<u8>;
+    fn decode_key(b: Vec<u8>) -> Self;
+}
+
+impl Key for u64 {
+    fn encode_key(&self) -> Vec<u8> {
+        self.to_le_bytes().to_vec()
+    }
+    fn decode_key(buff: Vec<u8>) -> u64 {
+        u64::from_le_bytes(buff.try_into().unwrap())
+    }
+}
+
+pub trait Operations<K: Key, E: Entity> {
+    fn get(&self, id: K) -> Result<Option<E>, Box<dyn Error>>;
+    fn put(&mut self, e: &mut E) -> Result<K, Box<dyn Error>>;
     fn delete(&self, e: &E) -> Result<bool, Box<dyn Error>>;
 }
 
-pub trait OperationsBuilder<E: Entity> {
-    fn operations<'a>(db: &Database) -> Box<dyn Operations<E> + '_>;
+pub trait OperationsBuilder<K: Key, E: Entity> {
+    fn operations<'a>(db: &Database) -> Box<dyn Operations<K, E> + '_>;
 }
 
 #[derive(Debug, Clone)]
@@ -182,6 +196,9 @@ pub fn type_code(db: &Database, name: &String) -> Result<u64, Box<dyn Error>> {
             return Err(Box::new(e));
         }
     }
+
+    // BUG: type code is always 1 since we are not counting the number of types/ rows
+    // TODO: update a counter to track the number of rows in the types table/cf.
 
     // update the id before returning the value
     match db.put_cf(cf, name.as_bytes(), type_code.to_le_bytes().to_vec()) {
