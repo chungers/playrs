@@ -10,10 +10,12 @@ use crate::rocksdb::index::{Index, Indexes};
 use std::error::Error;
 
 impl db::Entity for Edge {
+    const TYPE: &'static str = "Edge";
+
     fn key(&self) -> Vec<u8> {
         return self.id.to_le_bytes().to_vec();
     }
-    fn encode(&self) -> Vec<u8> {
+    fn as_bytes(&self) -> Vec<u8> {
         return self.encode_to_vec();
     }
 }

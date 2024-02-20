@@ -216,7 +216,7 @@ pub fn go(cmd: &Command) {
                 }
                 KvVerb::Get(args) => {
                     trace!("Called get: {:?}", args);
-                    let mut ops = kv::StringKV::operations(&database);
+                    let ops = kv::StringKV::operations(&database);
                     let result = ops.get(args.key.to_string());
                     trace!("Result: {:?}", result);
                 }

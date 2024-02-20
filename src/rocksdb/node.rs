@@ -5,16 +5,39 @@ use prost::Message; // need the trait to encode protobuf
 
 use crate::rocksdb::db;
 use crate::rocksdb::graph::Node;
-use crate::rocksdb::index::{Index, Indexes, Queries};
+use crate::rocksdb::index::{Index, Indexes};
 
-use std::convert::TryInto;
 use std::error::Error;
+use std::marker::PhantomData;
+
+#[test]
+fn test_using_node_id() {
+    let id: db::Id<Node> = db::Id::<Node> {
+        key: vec![],
+        phantom: PhantomData::<Node>,
+    };
+
+    println!("Got id = {:?}", id);
+
+    let node = Node {
+        id: 1u64,
+        type_name: "foo".into(),
+        type_code: 2u64,
+        name: "foo".into(),
+        doc: vec![],
+    };
+
+    use crate::rocksdb::db::Entity;
+    println!("Got id = {:?}", node.id());
+}
 
 impl db::Entity for Node {
+    const TYPE: &'static str = "Node";
+
     fn key(&self) -> Vec<u8> {
         return self.id.to_le_bytes().to_vec();
     }
-    fn encode(&self) -> Vec<u8> {
+    fn as_bytes(&self) -> Vec<u8> {
         return self.encode_to_vec();
     }
 }

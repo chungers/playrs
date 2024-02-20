@@ -10,6 +10,7 @@ pub trait Indexes<E: db::Entity> {
     fn indexes() -> Vec<Box<dyn Index<E>>>;
 }
 
+// TODO - fix this. Queries can depend on the Entity...
 pub trait Queries<E: db::Entity> {}
 
 #[derive(Debug, Clone)]
@@ -31,7 +32,7 @@ pub trait Index<E: db::Entity + std::fmt::Debug> {
 
     // Default implementation is to store the bytes of the entity
     fn key_value(&self, e: &E) -> (Vec<u8>, Vec<u8>) {
-        return (e.key(), e.encode());
+        return (e.key(), e.as_bytes());
     }
 
     fn update_entry(
