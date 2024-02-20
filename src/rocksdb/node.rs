@@ -8,17 +8,9 @@ use crate::rocksdb::graph::Node;
 use crate::rocksdb::index::{Index, Indexes};
 
 use std::error::Error;
-use std::marker::PhantomData;
 
 #[test]
 fn test_using_node_id() {
-    let id: db::Id<Node> = db::Id::<Node> {
-        key: vec![],
-        phantom: PhantomData::<Node>,
-    };
-
-    println!("Got id = {:?}", id);
-
     let node = Node {
         id: 1u64,
         type_name: "foo".into(),
@@ -27,16 +19,21 @@ fn test_using_node_id() {
         doc: vec![],
     };
 
-    use crate::rocksdb::db::Entity;
+    use crate::rocksdb::db::HasKey;
     println!("Got id = {:?}", node.id());
+}
+
+impl db::HasKey<u64> for Node {
+    fn key(&self) -> u64 {
+        self.id
+    }
 }
 
 impl db::Entity for Node {
     const TYPE: &'static str = "Node";
-
-    fn key(&self) -> Vec<u8> {
-        return self.id.to_le_bytes().to_vec();
-    }
+    // fn key(&self) -> Vec<u8> {
+    //     return self.id.to_le_bytes().to_vec();
+    // }
     fn as_bytes(&self) -> Vec<u8> {
         return self.encode_to_vec();
     }
@@ -118,19 +115,24 @@ pub struct ByType;
 
 impl Index<Node> for ById {
     fn cf_name(&self) -> &'static str {
-        return "index.node.id";
+        "index.node.id"
+    }
+    fn key_value(&self, e: &Node) -> (Vec<u8>, Vec<u8>) {
+        use crate::rocksdb::db::Entity;
+        use crate::rocksdb::db::HasKey;
+        (e.id().as_bytes(), e.as_bytes())
     }
 }
 
 impl Index<Node> for ByType {
     fn cf_name(&self) -> &'static str {
-        return "index.node.type";
+        "index.node.type"
     }
     fn key_value(&self, n: &Node) -> (Vec<u8>, Vec<u8>) {
-        return (
+        (
             n.type_code.to_le_bytes().to_vec(),
             n.id.to_le_bytes().to_vec(),
-        );
+        )
     }
 }
 

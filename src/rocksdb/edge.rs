@@ -9,12 +9,17 @@ use crate::rocksdb::index::{Index, Indexes};
 
 use std::error::Error;
 
+impl db::HasKey<u64> for Edge {
+    fn key(&self) -> u64 {
+        self.id
+    }
+}
+
 impl db::Entity for Edge {
     const TYPE: &'static str = "Edge";
-
-    fn key(&self) -> Vec<u8> {
-        return self.id.to_le_bytes().to_vec();
-    }
+    // fn key(&self) -> Vec<u8> {
+    //     return self.id.to_le_bytes().to_vec();
+    // }
     fn as_bytes(&self) -> Vec<u8> {
         return self.encode_to_vec();
     }
@@ -82,6 +87,8 @@ impl Indexes<Edge> for Edge {
             Box::new(ByType),
             // By head, tail
             Box::new(ByHeadTail),
+            // By tail, head
+            Box::new(ByTailHead),
         ];
     }
 }
@@ -95,6 +102,9 @@ pub struct ByType;
 #[derive(Debug, Clone, PartialEq)]
 pub struct ByHeadTail;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ByTailHead;
+
 impl std::fmt::Debug for dyn Index<Edge> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(self.cf_name()).finish()
@@ -103,30 +113,45 @@ impl std::fmt::Debug for dyn Index<Edge> {
 
 impl Index<Edge> for ById {
     fn cf_name(&self) -> &'static str {
-        return "index.edge.id";
+        "index.edge.id"
     }
-    // default of key_value encodes the full Edge blob as value
+    fn key_value(&self, e: &Edge) -> (Vec<u8>, Vec<u8>) {
+        use crate::rocksdb::db::Entity;
+        use crate::rocksdb::db::HasKey;
+        (e.id().as_bytes(), e.as_bytes())
+    }
 }
 
 impl Index<Edge> for ByType {
     fn cf_name(&self) -> &'static str {
-        return "index.edge.type";
+        "index.edge.type"
     }
     fn key_value(&self, e: &Edge) -> (Vec<u8>, Vec<u8>) {
-        return (
+        (
             e.type_code.to_le_bytes().to_vec(),
             e.id.to_le_bytes().to_vec(),
-        );
+        )
     }
 }
 
 impl Index<Edge> for ByHeadTail {
     fn cf_name(&self) -> &'static str {
-        return "index.edge.head-tail";
+        "index.edge.head-tail"
     }
     fn key_value(&self, e: &Edge) -> (Vec<u8>, Vec<u8>) {
         let mut key = e.head.to_le_bytes().to_vec();
         key.extend(e.tail.to_le_bytes().to_vec());
+        return (key, e.id.to_le_bytes().to_vec());
+    }
+}
+
+impl Index<Edge> for ByTailHead {
+    fn cf_name(&self) -> &'static str {
+        "index.edge.tail-head"
+    }
+    fn key_value(&self, e: &Edge) -> (Vec<u8>, Vec<u8>) {
+        let mut key = e.tail.to_le_bytes().to_vec();
+        key.extend(e.head.to_le_bytes().to_vec());
         return (key, e.id.to_le_bytes().to_vec());
     }
 }
