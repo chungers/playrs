@@ -31,9 +31,7 @@ pub trait Index<E: db::Entity + std::fmt::Debug> {
     fn cf_name(&self) -> &'static str;
 
     // Default implementation is to store the bytes of the entity
-    fn key_value(&self, e: &E) -> (Vec<u8>, Vec<u8>) {
-        return (e.key(), e.as_bytes());
-    }
+    fn key_value(&self, e: &E) -> (Vec<u8>, Vec<u8>);
 
     fn update_entry(
         &self,

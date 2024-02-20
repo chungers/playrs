@@ -2,26 +2,28 @@
 use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::db;
-use crate::rocksdb::db::Key;
+use crate::rocksdb::db::KeyCodec;
 use crate::rocksdb::index::Index;
 
 use std::error::Error;
 
+impl db::HasKey<String> for (String, String) {
+    fn key(&self) -> String {
+        self.0.to_string()
+    }
+}
+
 impl db::Entity for (String, String) {
     const TYPE: &'static str = "(String,String)";
-
-    fn key(&self) -> Vec<u8> {
-        return self.0.as_bytes().to_vec();
-    }
     fn as_bytes(&self) -> Vec<u8> {
-        return self.1.as_bytes().to_vec();
+        self.1.as_bytes().to_vec()
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StringKV;
 
-impl Key for String {
+impl KeyCodec for String {
     fn encode_key(&self) -> Vec<u8> {
         self.as_bytes().to_vec()
     }

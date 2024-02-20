@@ -24,30 +24,40 @@ pub type Transaction = WriteBatchWithTransaction<false>;
 
 #[derive(Debug)]
 pub struct Id<E: Entity + ?Sized> {
-    pub key: Vec<u8>,
-    pub phantom: PhantomData<E>,
+    key: Vec<u8>,
+    phantom: PhantomData<E>,
 }
 
-pub trait Entity {
-    const TYPE: &'static str;
+impl<E: Entity + ?Sized> Id<E> {
+    pub fn as_bytes(&self) -> Vec<u8> {
+        self.key.to_vec()
+    }
+}
 
-    // Deprecate this soon and expose only Id()
-    fn key(&self) -> Vec<u8>;
-    fn as_bytes(&self) -> Vec<u8>;
-    fn id(&self) -> Id<Self> {
+pub trait KeyCodec {
+    fn encode_key(&self) -> Vec<u8>;
+    fn decode_key(b: Vec<u8>) -> Self;
+}
+
+pub trait HasKey<K: KeyCodec> {
+    fn key(&self) -> K;
+    fn id(&self) -> Id<Self>
+    where
+        Self: Entity,
+    {
         return Id::<Self> {
-            key: self.key(),
+            key: self.key().encode_key(),
             phantom: PhantomData::<Self>,
         };
     }
 }
 
-pub trait Key {
-    fn encode_key(&self) -> Vec<u8>;
-    fn decode_key(b: Vec<u8>) -> Self;
+pub trait Entity {
+    const TYPE: &'static str;
+    fn as_bytes(&self) -> Vec<u8>;
 }
 
-impl Key for u64 {
+impl KeyCodec for u64 {
     fn encode_key(&self) -> Vec<u8> {
         self.to_le_bytes().to_vec()
     }
@@ -56,13 +66,13 @@ impl Key for u64 {
     }
 }
 
-pub trait Operations<K: Key, E: Entity> {
+pub trait Operations<K: KeyCodec, E: Entity + HasKey<K>> {
     fn get(&self, id: K) -> Result<Option<E>, Box<dyn Error>>;
     fn put(&mut self, e: &mut E) -> Result<K, Box<dyn Error>>;
     fn delete(&self, e: &E) -> Result<bool, Box<dyn Error>>;
 }
 
-pub trait OperationsBuilder<K: Key, E: Entity> {
+pub trait OperationsBuilder<K: KeyCodec, E: Entity + HasKey<K>> {
     fn operations<'a>(db: &Database) -> Box<dyn Operations<K, E> + '_>;
 }
 
