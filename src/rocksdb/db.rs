@@ -11,6 +11,7 @@ use rocksdb::{
 use std::convert::TryInto;
 use std::error::Error;
 use std::fmt;
+use std::marker::PhantomData;
 use std::path::Path;
 
 pub trait DbInfo {
@@ -21,17 +22,24 @@ pub trait DbInfo {
 pub type Database = DBWithThreadMode<SingleThreaded>;
 pub type Transaction = WriteBatchWithTransaction<false>;
 
-pub trait VisitKV {
-    fn visit(&self, _: &[u8], _: &[u8]);
-}
-
-pub trait IndexBuilder {
-    fn cf_names(&self) -> Vec<String>;
+#[derive(Debug)]
+pub struct Id<E: Entity + ?Sized> {
+    pub key: Vec<u8>,
+    pub phantom: PhantomData<E>,
 }
 
 pub trait Entity {
+    const TYPE: &'static str;
+
+    // Deprecate this soon and expose only Id()
     fn key(&self) -> Vec<u8>;
-    fn encode(&self) -> Vec<u8>;
+    fn as_bytes(&self) -> Vec<u8>;
+    fn id(&self) -> Id<Self> {
+        return Id::<Self> {
+            key: self.key(),
+            phantom: PhantomData::<Self>,
+        };
+    }
 }
 
 pub trait Key {
@@ -56,6 +64,14 @@ pub trait Operations<K: Key, E: Entity> {
 
 pub trait OperationsBuilder<K: Key, E: Entity> {
     fn operations<'a>(db: &Database) -> Box<dyn Operations<K, E> + '_>;
+}
+
+pub trait VisitKV {
+    fn visit(&self, _: &[u8], _: &[u8]);
+}
+
+pub trait IndexBuilder {
+    fn cf_names(&self) -> Vec<String>;
 }
 
 #[derive(Debug, Clone)]
@@ -256,54 +272,6 @@ pub fn indexes(
         Ok(l) => Ok(l),
         Err(e) => {
             error!("Error listing column families {:?}", e);
-            Err(Box::new(e))
-        }
-    }
-}
-
-pub fn put(info: &dyn DbInfo, key: &str, value: &str) -> Result<(), Box<dyn Error>> {
-    trace!("Put path={}, key={}, value={}", info.path(), key, value);
-
-    let db = open_db(info, &All)?;
-    trace!("DB = {:?}", db);
-
-    let cf = db.cf_handle(kv::StringKV.cf_name()).unwrap();
-    let kv = kv::StringKV.key_value(&(key.to_string(), value.to_string()));
-    match db.put_cf(cf, kv.0, kv.1) {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            error!("Error retrieving value for {}: {}", key, e);
-            Err(Box::new(e))
-        }
-    }
-}
-
-pub fn get(
-    info: &dyn DbInfo,
-    key: &str,
-    visitor: &dyn VisitKV,
-) -> Result<Option<String>, Box<dyn Error>> {
-    trace!("Get path={}, key={}", info.path(), key);
-
-    let db = open_db(info, &All)?;
-    trace!("DB = {:?}", db);
-
-    let cf = db.cf_handle(kv::StringKV.cf_name()).unwrap();
-    match db.get_cf(cf, key.as_bytes()) {
-        Ok(Some(v)) => {
-            let result = String::from_utf8(v).unwrap();
-            trace!("Finding '{}' returns '{}'", key, result);
-
-            visitor.visit(key.as_bytes(), result.as_bytes());
-
-            Ok(Some(result))
-        }
-        Ok(None) => {
-            trace!("Finding '{}' returns None", key);
-            Ok(None)
-        }
-        Err(e) => {
-            error!("Error retrieving value for {}: {}", key, e);
             Err(Box::new(e))
         }
     }

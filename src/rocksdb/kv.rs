@@ -5,14 +5,15 @@ use crate::rocksdb::db;
 use crate::rocksdb::db::Key;
 use crate::rocksdb::index::Index;
 
-use std::convert::TryFrom;
 use std::error::Error;
 
 impl db::Entity for (String, String) {
+    const TYPE: &'static str = "(String,String)";
+
     fn key(&self) -> Vec<u8> {
         return self.0.as_bytes().to_vec();
     }
-    fn encode(&self) -> Vec<u8> {
+    fn as_bytes(&self) -> Vec<u8> {
         return self.1.as_bytes().to_vec();
     }
 }
