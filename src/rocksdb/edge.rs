@@ -22,13 +22,13 @@ struct Operations<'a> {
     db: &'a db::Database,
 }
 
-impl db::OperationsBuilder<Edge> for Edge {
-    fn operations<'a>(db: &db::Database) -> Box<dyn db::Operations<Edge> + '_> {
+impl db::OperationsBuilder<u64, Edge> for Edge {
+    fn operations<'a>(db: &db::Database) -> Box<dyn db::Operations<u64, Edge> + '_> {
         return Box::new(Operations { db: db });
     }
 }
 
-impl db::Operations<Edge> for Operations<'_> {
+impl db::Operations<u64, Edge> for Operations<'_> {
     fn get(&self, id: u64) -> Result<Option<Edge>, Box<dyn Error>> {
         let cf = self.db.cf_handle(ById.cf_name()).unwrap();
         match self.db.get_cf(cf, u64::to_le_bytes(id)) {
@@ -49,7 +49,9 @@ impl db::Operations<Edge> for Operations<'_> {
     }
 
     fn put(&mut self, edge: &mut Edge) -> Result<u64, Box<dyn Error>> {
-        edge.id = db::next_id(self.db)?;
+        if edge.id == 0 {
+            edge.id = db::next_id(self.db)?;
+        }
         edge.type_code = db::type_code(self.db, &edge.type_name)?;
 
         let mut txn = db::Transaction::default();

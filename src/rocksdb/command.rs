@@ -3,6 +3,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::db;
 use crate::rocksdb::graph::{Edge, Node};
+use crate::rocksdb::kv;
 use crate::rocksdb::All;
 
 use crate::rocksdb::db::OperationsBuilder;
@@ -131,6 +132,9 @@ pub struct NodePutArgs {
     name: String,
     /// The description of the node
     description: Option<String>,
+    /// The id of the node
+    #[clap(long = "id")]
+    id: Option<u64>,
 }
 
 #[derive(Debug, clapArgs)]
@@ -159,6 +163,9 @@ pub struct EdgePutArgs {
     tail: u64,
     /// The name of the edge / relation
     name: String,
+    /// The id of the node
+    #[clap(long = "id")]
+    id: Option<u64>,
 }
 
 #[derive(Debug, clapArgs)]
@@ -203,12 +210,14 @@ pub fn go(cmd: &Command) {
             match &kvcmd.verb {
                 KvVerb::Put(args) => {
                     trace!("Called put: {:?}", args);
-                    let result = db::put(&cmd.db, &args.key, &args.value);
+                    let mut ops = kv::StringKV::operations(&database);
+                    let result = ops.put(&mut (args.key.to_string(), args.value.to_string()));
                     trace!("Result: {:?}", result);
                 }
                 KvVerb::Get(args) => {
                     trace!("Called get: {:?}", args);
-                    let result = db::get(&cmd.db, &args.key, &visit);
+                    let mut ops = kv::StringKV::operations(&database);
+                    let result = ops.get(args.key.to_string());
                     trace!("Result: {:?}", result);
                 }
                 KvVerb::Delete(args) => {
@@ -230,8 +239,12 @@ pub fn go(cmd: &Command) {
 
             match &ncmd.verb {
                 NodeVerb::Put(args) => {
+                    let id: u64 = match args.id {
+                        Some(v) => v,
+                        None => 0,
+                    };
                     let mut node = Node {
-                        id: 0,
+                        id: id,
                         type_name: args.name.clone(),
                         type_code: 0,
                         name: args.name.clone(),
@@ -267,8 +280,12 @@ pub fn go(cmd: &Command) {
             let database = db::open_db(&cmd.db, &All).unwrap();
             match &ncmd.verb {
                 EdgeVerb::Put(args) => {
+                    let id: u64 = match args.id {
+                        Some(v) => v,
+                        None => 0,
+                    };
                     let mut edge = Edge {
-                        id: 0,
+                        id: id,
                         head: args.head,
                         tail: args.tail,
                         type_name: args.name.clone(),

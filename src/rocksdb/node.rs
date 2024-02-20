@@ -7,6 +7,7 @@ use crate::rocksdb::db;
 use crate::rocksdb::graph::Node;
 use crate::rocksdb::index::{Index, Indexes, Queries};
 
+use std::convert::TryInto;
 use std::error::Error;
 
 impl db::Entity for Node {
@@ -22,13 +23,13 @@ struct Operations<'a> {
     db: &'a db::Database,
 }
 
-impl db::OperationsBuilder<Node> for Node {
-    fn operations<'a>(db: &db::Database) -> Box<dyn db::Operations<Node> + '_> {
+impl db::OperationsBuilder<u64, Node> for Node {
+    fn operations<'a>(db: &db::Database) -> Box<dyn db::Operations<u64, Node> + '_> {
         return Box::new(Operations { db: db });
     }
 }
 
-impl db::Operations<Node> for Operations<'_> {
+impl db::Operations<u64, Node> for Operations<'_> {
     fn get(&self, id: u64) -> Result<Option<Node>, Box<dyn Error>> {
         let cf = self.db.cf_handle(ById.cf_name()).unwrap();
         match self.db.get_cf(cf, u64::to_le_bytes(id)) {
@@ -48,7 +49,9 @@ impl db::Operations<Node> for Operations<'_> {
         }
     }
     fn put(&mut self, node: &mut Node) -> Result<u64, Box<dyn Error>> {
-        node.id = db::next_id(self.db)?;
+        if node.id == 0 {
+            node.id = db::next_id(self.db)?;
+        }
         node.type_code = db::type_code(self.db, &node.type_name)?;
 
         let mut txn = db::Transaction::default();
