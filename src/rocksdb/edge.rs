@@ -8,73 +8,58 @@ use crate::rocksdb::graph::Edge;
 use crate::rocksdb::index::{Index, Indexes};
 
 use std::error::Error;
+use std::io::Cursor;
 
 impl db::HasKey<u64> for Edge {
-    fn key(&self) -> u64 {
-        self.id
+    fn key(&self) -> Option<u64> {
+        if self.id > 0 {
+            Some(self.id)
+        } else {
+            None
+        }
     }
 }
 
 impl db::Entity for Edge {
     const TYPE: &'static str = "Edge";
-    // fn key(&self) -> Vec<u8> {
-    //     return self.id.to_le_bytes().to_vec();
-    // }
     fn as_bytes(&self) -> Vec<u8> {
         return self.encode_to_vec();
     }
-}
-
-struct Operations<'a> {
-    db: &'a db::Database,
-}
-
-impl db::OperationsBuilder<u64, Edge> for Edge {
-    fn operations<'a>(db: &db::Database) -> Box<dyn db::Operations<u64, Edge> + '_> {
-        return Box::new(Operations { db: db });
-    }
-}
-
-impl db::Operations<u64, Edge> for Operations<'_> {
-    fn get(&self, id: u64) -> Result<Option<Edge>, Box<dyn Error>> {
-        let cf = self.db.cf_handle(ById.cf_name()).unwrap();
-        match self.db.get_cf(cf, u64::to_le_bytes(id)) {
-            Ok(Some(bytes)) => {
-                trace!("Found edge id = {:?} found {:?}", id, bytes);
-                let decoded: Edge = Message::decode(&bytes[..])?;
-                Ok(Some(decoded))
-            }
-            Ok(None) => {
-                trace!("No edge id = {:?} found", id);
-                Ok(None)
-            }
-            Err(e) => {
-                error!("Error: {:?}", e);
-                Err(Box::new(e))
-            }
+    fn from_bytes(bytes: &[u8]) -> Result<Edge, Box<dyn Error>> {
+        match Edge::decode(Cursor::new(bytes)) {
+            Ok(edge) => Ok(edge),
+            Err(e) => Err(Box::new(e)),
         }
     }
+}
 
-    fn put(&mut self, edge: &mut Edge) -> Result<u64, Box<dyn Error>> {
+impl db::OperationsBuilder<Edge> for Edge {
+    fn operations(db: &db::Database) -> Box<dyn db::Operations<Edge> + '_> {
+        Box::new(db::OperationsImpl::<u64, Edge> {
+            db: db,
+            custom: &OperationsImpl {},
+        })
+    }
+}
+
+struct OperationsImpl {}
+
+impl db::OperationsCustom<u64, Edge> for OperationsImpl {
+    fn value_index(&self) -> &dyn Index<Edge> {
+        &ById
+    }
+    fn indexes(&self) -> Vec<Box<dyn Index<Edge>>> {
+        Edge::indexes()
+    }
+    fn before_put(&self, db: &db::Database, edge: &mut Edge) -> Result<(), Box<dyn Error>> {
         if edge.id == 0 {
-            edge.id = db::next_id(self.db)?;
+            edge.id = db::next_id(db)?;
         }
-        edge.type_code = db::type_code(self.db, &edge.type_name)?;
-
-        let mut txn = db::Transaction::default();
-        let _: Vec<_> = Edge::indexes()
-            .iter()
-            .map(|index| index.update_entry(self.db, &mut txn, &edge))
-            .collect();
-
-        self.db.write(txn)?;
-
-        Ok(edge.id)
+        edge.type_code = db::type_code(db, &edge.type_name)?;
+        Ok(())
     }
-
-    fn delete(&self, edge: &Edge) -> Result<bool, Box<dyn Error>> {
-        trace!("Deleting {:?}", edge);
-        Ok(true)
+    fn from_bytes(&self, buff: &[u8]) -> Result<Edge, Box<dyn Error>> {
+        Ok(Message::decode(&buff[..])?)
     }
 }
 

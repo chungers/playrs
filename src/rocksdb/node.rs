@@ -8,85 +8,58 @@ use crate::rocksdb::graph::Node;
 use crate::rocksdb::index::{Index, Indexes};
 
 use std::error::Error;
-
-#[test]
-fn test_using_node_id() {
-    let node = Node {
-        id: 1u64,
-        type_name: "foo".into(),
-        type_code: 2u64,
-        name: "foo".into(),
-        doc: vec![],
-    };
-
-    use crate::rocksdb::db::HasKey;
-    println!("Got id = {:?}", node.id());
-}
+use std::io::Cursor;
 
 impl db::HasKey<u64> for Node {
-    fn key(&self) -> u64 {
-        self.id
+    fn key(&self) -> Option<u64> {
+        if self.id > 0 {
+            Some(self.id)
+        } else {
+            None
+        }
     }
 }
 
 impl db::Entity for Node {
     const TYPE: &'static str = "Node";
-    // fn key(&self) -> Vec<u8> {
-    //     return self.id.to_le_bytes().to_vec();
-    // }
     fn as_bytes(&self) -> Vec<u8> {
         return self.encode_to_vec();
     }
-}
-
-struct Operations<'a> {
-    db: &'a db::Database,
-}
-
-impl db::OperationsBuilder<u64, Node> for Node {
-    fn operations<'a>(db: &db::Database) -> Box<dyn db::Operations<u64, Node> + '_> {
-        return Box::new(Operations { db: db });
-    }
-}
-
-impl db::Operations<u64, Node> for Operations<'_> {
-    fn get(&self, id: u64) -> Result<Option<Node>, Box<dyn Error>> {
-        let cf = self.db.cf_handle(ById.cf_name()).unwrap();
-        match self.db.get_cf(cf, u64::to_le_bytes(id)) {
-            Ok(Some(bytes)) => {
-                trace!("Found node id = {:?} found {:?}", id, bytes);
-                let decoded: Node = Message::decode(&bytes[..])?;
-                Ok(Some(decoded))
-            }
-            Ok(None) => {
-                trace!("No node id = {:?} found", id);
-                Ok(None)
-            }
-            Err(e) => {
-                error!("Error: {:?}", e);
-                Err(Box::new(e))
-            }
+    fn from_bytes(bytes: &[u8]) -> Result<Node, Box<dyn Error>> {
+        match Node::decode(Cursor::new(bytes)) {
+            Ok(node) => Ok(node),
+            Err(e) => Err(Box::new(e)),
         }
     }
-    fn put(&mut self, node: &mut Node) -> Result<u64, Box<dyn Error>> {
+}
+
+impl db::OperationsBuilder<Node> for Node {
+    fn operations(db: &db::Database) -> Box<dyn db::Operations<Node> + '_> {
+        Box::new(db::OperationsImpl::<u64, Node> {
+            db: db,
+            custom: &OperationsImpl {},
+        })
+    }
+}
+
+struct OperationsImpl {}
+
+impl db::OperationsCustom<u64, Node> for OperationsImpl {
+    fn value_index(&self) -> &dyn Index<Node> {
+        &ById
+    }
+    fn indexes(&self) -> Vec<Box<dyn Index<Node>>> {
+        Node::indexes()
+    }
+    fn before_put(&self, db: &db::Database, node: &mut Node) -> Result<(), Box<dyn Error>> {
         if node.id == 0 {
-            node.id = db::next_id(self.db)?;
+            node.id = db::next_id(db)?;
         }
-        node.type_code = db::type_code(self.db, &node.type_name)?;
-
-        let mut txn = db::Transaction::default();
-        let _: Vec<_> = Node::indexes()
-            .iter()
-            .map(|index| index.update_entry(self.db, &mut txn, &node))
-            .collect();
-
-        self.db.write(txn)?;
-
-        Ok(node.id)
+        node.type_code = db::type_code(db, &node.type_name)?;
+        Ok(())
     }
-    fn delete(&self, node: &Node) -> Result<bool, Box<dyn Error>> {
-        trace!("Deleting {:?}", node);
-        Ok(true)
+    fn from_bytes(&self, buff: &[u8]) -> Result<Node, Box<dyn Error>> {
+        Ok(Message::decode(&buff[..])?)
     }
 }
 
@@ -159,6 +132,21 @@ fn test_using_node_indexes() {
             doc: vec![],
         })
     );
+}
+
+#[test]
+fn test_using_node_id() {
+    let node = Node {
+        id: 1u64,
+        type_name: "foo".into(),
+        type_code: 2u64,
+        name: "foo".into(),
+        doc: vec![],
+    };
+
+    use db::HasKey;
+    println!("Got id = {:?}", node.id());
+    println!("Id from raw = {:?}", Node::id_from(1u64));
 }
 
 #[test]

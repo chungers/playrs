@@ -26,13 +26,23 @@ impl fmt::Display for ErrMissingIndex {
     }
 }
 
-pub trait Index<E: db::Entity + std::fmt::Debug> {
-    // Name of the column family
+pub trait Index<E: db::Entity> {
+    // Name of the column family that backs this index
     fn cf_name(&self) -> &'static str;
 
-    // Default implementation is to store the bytes of the entity
+    // Returns the (key, value) for the index
     fn key_value(&self, e: &E) -> (Vec<u8>, Vec<u8>);
 
+    // TODO -
+    // Index keys can change based on the fields changed.
+    // If we had index on obj.foo and obj.bar and now we have
+    // obj.foo' and obj.bar', we need to 1) remove the index
+    // keyed by (obj.foo, obj.bar) and add (obj.foo', obj.bar').
+    // This means we need to have a copy of the old value of e.
+    // Under the covers, before updating the value index, which
+    // stores (id, value), we have to read the old value and then
+    // remove the index entry at (value.foo, value.bar) and the
+    // add the index entry at (value.foo', value.bar').
     fn update_entry(
         &self,
         db: &db::Database,
@@ -42,9 +52,8 @@ pub trait Index<E: db::Entity + std::fmt::Debug> {
         match db.cf_handle(self.cf_name()) {
             Some(cf) => {
                 let kv = self.key_value(e);
-
                 trace!(
-                    "update entry in index {:?}, (k,v) = ({:?},{:?})",
+                    "Update entry in index {:?}, (k,v) = ({:?},{:?})",
                     self.cf_name(),
                     kv.0,
                     kv.1
@@ -60,12 +69,30 @@ pub trait Index<E: db::Entity + std::fmt::Debug> {
             }
         }
     }
-    fn delete_entry(&self, e: &E) -> Result<(), Box<dyn Error>> {
-        trace!(
-            "delete entry in index {:?}, entry = {:?}",
-            self.cf_name(),
-            e
-        );
-        Ok(())
+    fn delete_entry(
+        &self,
+        db: &db::Database,
+        txn: &mut db::Transaction,
+        e: &E,
+    ) -> Result<(), Box<dyn Error>> {
+        match db.cf_handle(self.cf_name()) {
+            Some(cf) => {
+                let kv = self.key_value(e);
+                trace!(
+                    "Delete entry in index {:?}, (k,v) = ({:?},{:?})",
+                    self.cf_name(),
+                    kv.0,
+                    kv.1,
+                );
+                txn.put_cf(cf, kv.0, vec![]);
+                Ok(())
+            }
+            None => {
+                trace!("Column family not found: {:?}", self.cf_name());
+                Err(Box::new(ErrMissingIndex {
+                    cf_name: self.cf_name().to_string(),
+                }))
+            }
+        }
     }
 }
