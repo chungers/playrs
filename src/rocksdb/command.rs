@@ -2,6 +2,7 @@
 use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::db;
+use crate::rocksdb::db::HasKey;
 use crate::rocksdb::graph::{Edge, Node};
 use crate::rocksdb::kv;
 use crate::rocksdb::All;
@@ -217,7 +218,7 @@ pub fn go(cmd: &Command) {
                 KvVerb::Get(args) => {
                     trace!("Called get: {:?}", args);
                     let ops = kv::StringKV::operations(&database);
-                    let result = ops.get(args.key.to_string());
+                    let result = ops.get(<(String, String)>::id_from(args.key.to_string()));
                     trace!("Result: {:?}", result);
                 }
                 KvVerb::Delete(args) => {
@@ -258,7 +259,7 @@ pub fn go(cmd: &Command) {
                 }
                 NodeVerb::Get(args) => {
                     let ops = Node::operations(&database);
-                    let result = ops.get(args.id);
+                    let result = ops.get(Node::id_from(args.id));
 
                     trace!("Result: {:?}", result);
                     match result {
@@ -300,7 +301,7 @@ pub fn go(cmd: &Command) {
                 }
                 EdgeVerb::Get(args) => {
                     let ops = Edge::operations(&database);
-                    let result = ops.get(args.id);
+                    let result = ops.get(Edge::id_from(args.id));
 
                     trace!("Result: {:?}", result);
                     match result {

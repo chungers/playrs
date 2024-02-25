@@ -8,15 +8,37 @@ use crate::rocksdb::index::Index;
 use std::error::Error;
 
 impl db::HasKey<String> for (String, String) {
-    fn key(&self) -> String {
-        self.0.to_string()
+    fn key(&self) -> Option<String> {
+        if self.0.len() > 0 {
+            Some(self.0.to_string())
+        } else {
+            None
+        }
     }
+}
+
+#[test]
+fn test_using_node_id() {
+    let kv = ("foo".into(), "bar".into());
+
+    use db::HasKey;
+    println!("Got id = {:?}", kv.id());
+    println!(
+        "Id from raw = {:?}",
+        <(String, String)>::id_from("foo".into())
+    );
 }
 
 impl db::Entity for (String, String) {
     const TYPE: &'static str = "(String,String)";
     fn as_bytes(&self) -> Vec<u8> {
         self.1.as_bytes().to_vec()
+    }
+    fn from_bytes(bytes: &[u8]) -> Result<(String, String), Box<dyn Error>> {
+        match String::from_utf8(bytes.to_vec()) {
+            Ok(s) => Ok((s.clone(), s)),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 }
 
@@ -32,52 +54,32 @@ impl KeyCodec for String {
     }
 }
 
-struct Operations<'a> {
-    db: &'a db::Database,
-}
-
-impl db::OperationsBuilder<String, (String, String)> for StringKV {
-    fn operations<'a>(db: &db::Database) -> Box<dyn db::Operations<String, (String, String)> + '_> {
-        return Box::new(Operations { db: db });
+impl db::OperationsBuilder<(String, String)> for StringKV {
+    fn operations(db: &db::Database) -> Box<dyn db::Operations<(String, String)> + '_> {
+        Box::new(db::OperationsImpl::<String, (String, String)> {
+            db: db,
+            custom: &OperationsImpl {},
+        })
     }
 }
+struct OperationsImpl {}
 
-impl db::Operations<String, (String, String)> for Operations<'_> {
-    fn get(&self, key: String) -> Result<Option<(String, String)>, Box<dyn Error>> {
-        let cf = self.db.cf_handle(StringKV.cf_name()).unwrap();
-        match self.db.get_cf(cf, key.as_bytes()) {
-            Ok(Some(v)) => {
-                let result = String::from_utf8(v).unwrap();
-                trace!("Finding '{}' returns '{}'", key, result);
-                Ok(Some((key, result)))
-            }
-            Ok(None) => {
-                trace!("Finding '{}' returns None", key);
-                Ok(None)
-            }
-            Err(e) => {
-                error!("Error retrieving value for {}: {}", key, e);
-                Err(Box::new(e))
-            }
-        }
+impl db::OperationsCustom<String, (String, String)> for OperationsImpl {
+    fn value_index(&self) -> &dyn Index<(String, String)> {
+        &StringKV
     }
-
-    // TODO - The u64 return type doesn't work for simple string key-values.
-    fn put(&mut self, pair: &mut (String, String)) -> Result<String, Box<dyn Error>> {
-        let cf = self.db.cf_handle(StringKV.cf_name()).unwrap();
-        let kv = StringKV.key_value(&(pair.0.to_string(), pair.1.to_string()));
-        trace!("put_cf: {:?}, ({:?}, {:?})", StringKV.cf_name(), kv.0, kv.1);
-        match self.db.put_cf(cf, kv.0, kv.1) {
-            Ok(()) => Ok(pair.0.to_string()),
-            Err(e) => {
-                error!("Error put for ({:?}: {}", pair, e);
-                Err(Box::new(e))
-            }
-        }
+    fn indexes(&self) -> Vec<Box<dyn Index<(String, String)>>> {
+        vec![]
     }
-
-    fn delete(&self, kv: &(String, String)) -> Result<bool, Box<dyn Error>> {
-        Ok(true)
+    fn before_put(
+        &self,
+        _db: &db::Database,
+        _kv: &mut (String, String),
+    ) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
+    fn from_bytes(&self, _buff: &[u8]) -> Result<(String, String), Box<dyn Error>> {
+        todo!()
     }
 }
 

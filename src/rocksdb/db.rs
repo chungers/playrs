@@ -8,9 +8,11 @@ use crate::rocksdb::All;
 use rocksdb::{
     DBWithThreadMode, Direction, IteratorMode, SingleThreaded, WriteBatchWithTransaction, DB,
 };
+
 use std::convert::TryInto;
 use std::error::Error;
 use std::fmt;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::path::Path;
 
@@ -22,7 +24,7 @@ pub trait DbInfo {
 pub type Database = DBWithThreadMode<SingleThreaded>;
 pub type Transaction = WriteBatchWithTransaction<false>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Id<E: Entity + ?Sized> {
     key: Vec<u8>,
     phantom: PhantomData<E>,
@@ -40,21 +42,38 @@ pub trait KeyCodec {
 }
 
 pub trait HasKey<K: KeyCodec> {
-    fn key(&self) -> K;
+    fn key(&self) -> Option<K>; // Raw key; key may not be set
+    fn id_from(v: K) -> Id<Self>
+    where
+        Self: Entity,
+        Self: Sized,
+    {
+        return Id::<Self> {
+            key: v.encode_key(),
+            phantom: PhantomData::<Self>,
+        };
+    }
     fn id(&self) -> Id<Self>
     where
         Self: Entity,
+        Self: Sized,
     {
         return Id::<Self> {
-            key: self.key().encode_key(),
+            key: match self.key() {
+                Some(v) => v.encode_key(),
+                None => vec![],
+            },
             phantom: PhantomData::<Self>,
         };
     }
 }
 
-pub trait Entity {
+pub trait Entity: std::cmp::PartialEq {
     const TYPE: &'static str;
     fn as_bytes(&self) -> Vec<u8>;
+    fn from_bytes(bytes: &[u8]) -> Result<Self, Box<dyn Error>>
+    where
+        Self: Sized;
 }
 
 impl KeyCodec for u64 {
@@ -66,14 +85,62 @@ impl KeyCodec for u64 {
     }
 }
 
-pub trait Operations<K: KeyCodec, E: Entity + HasKey<K>> {
-    fn get(&self, id: K) -> Result<Option<E>, Box<dyn Error>>;
-    fn put(&mut self, e: &mut E) -> Result<K, Box<dyn Error>>;
+pub trait Operations<E: Entity> {
+    fn get(&self, id: Id<E>) -> Result<Option<E>, Box<dyn Error>>;
+    fn put(&mut self, e: &mut E) -> Result<Id<E>, Box<dyn Error>>;
     fn delete(&self, e: &E) -> Result<bool, Box<dyn Error>>;
 }
 
-pub trait OperationsBuilder<K: KeyCodec, E: Entity + HasKey<K>> {
-    fn operations<'a>(db: &Database) -> Box<dyn Operations<K, E> + '_>;
+pub trait OperationsBuilder<E: Entity> {
+    fn operations(db: &Database) -> Box<dyn Operations<E> + '_>;
+}
+
+pub trait OperationsCustom<K: KeyCodec, E: Entity + HasKey<K>> {
+    fn value_index(&self) -> &dyn Index<E>;
+    fn indexes(&self) -> Vec<Box<dyn Index<E>>>;
+    fn before_put(&self, db: &Database, e: &mut E) -> Result<(), Box<dyn Error>>;
+    fn from_bytes(&self, buff: &[u8]) -> Result<E, Box<dyn Error>>;
+}
+
+// TODO - Make the pub fields private - add a pub function to build this with a
+// custom operations
+pub struct OperationsImpl<'a, K: KeyCodec, E: Entity + HasKey<K>> {
+    pub db: &'a Database,
+    pub custom: &'a dyn OperationsCustom<K, E>,
+}
+
+impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_, K, E> {
+    fn get(&self, id: Id<E>) -> Result<Option<E>, Box<dyn Error>> {
+        let cf = self
+            .db
+            .cf_handle(self.custom.value_index().cf_name())
+            .unwrap();
+        match self.db.get_cf(cf, id.key) {
+            Ok(Some(bytes)) => Ok(Some(self.custom.from_bytes(&bytes[..])?)),
+            Ok(None) => Ok(None),
+            Err(e) => Err(Box::new(e)),
+        }
+    }
+    fn put(&mut self, o: &mut E) -> Result<Id<E>, Box<dyn Error>> {
+        self.custom.before_put(self.db, o)?;
+
+        // Get the old version before the update so we can reindex if needed.
+        let reindex: bool = self.get(o.id())?.unwrap() != *o;
+        trace!("Reindex = {}", reindex);
+
+        let mut txn = Transaction::default();
+        let _: Vec<_> = self
+            .custom
+            .indexes()
+            .iter()
+            .map(|index| index.update_entry(self.db, &mut txn, &o))
+            .collect();
+        self.db.write(txn)?;
+        Ok(o.id())
+    }
+    fn delete(&self, _o: &E) -> Result<bool, Box<dyn Error>> {
+        todo!()
+    }
 }
 
 pub trait VisitKV {
