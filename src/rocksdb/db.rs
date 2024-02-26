@@ -85,28 +85,39 @@ impl KeyCodec for u64 {
     }
 }
 
+// Implementations for typed entities must implement this
+// trait as a builder for getting an Operations trait implementation
+// which has CRUD methods.
+pub trait OperationsBuilder<E: Entity> {
+    fn operations(db: &Database) -> Box<dyn Operations<E> + '_>;
+}
+
 pub trait Operations<E: Entity> {
     fn get(&self, id: Id<E>) -> Result<Option<E>, Box<dyn Error>>;
     fn put(&mut self, e: &mut E) -> Result<Id<E>, Box<dyn Error>>;
     fn delete(&self, e: &E) -> Result<bool, Box<dyn Error>>;
 }
 
-pub trait OperationsBuilder<E: Entity> {
-    fn operations(db: &Database) -> Box<dyn Operations<E> + '_>;
-}
-
-pub trait OperationsCustom<K: KeyCodec, E: Entity + HasKey<K>> {
+pub trait IndexHelper<K: KeyCodec, E: Entity + HasKey<K>> {
     fn value_index(&self) -> &dyn Index<E>;
     fn indexes(&self) -> Vec<Box<dyn Index<E>>>;
     fn before_put(&self, db: &Database, e: &mut E) -> Result<(), Box<dyn Error>>;
     fn from_bytes(&self, buff: &[u8]) -> Result<E, Box<dyn Error>>;
 }
 
-// TODO - Make the pub fields private - add a pub function to build this with a
-// custom operations
-pub struct OperationsImpl<'a, K: KeyCodec, E: Entity + HasKey<K>> {
-    pub db: &'a Database,
-    pub custom: &'a dyn OperationsCustom<K, E>,
+pub fn entity_operations<K: KeyCodec + 'static, E: Entity + HasKey<K> + 'static>(
+    db: &Database,
+    ops: Box<dyn IndexHelper<K, E>>,
+) -> Box<dyn Operations<E> + '_> {
+    Box::new(OperationsImpl::<K, E> {
+        db: db,
+        custom: ops,
+    })
+}
+
+struct OperationsImpl<'a, K: KeyCodec, E: Entity + HasKey<K>> {
+    db: &'a Database,
+    custom: Box<dyn IndexHelper<K, E> + 'a>,
 }
 
 impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_, K, E> {

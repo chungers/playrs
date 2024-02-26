@@ -56,15 +56,12 @@ impl KeyCodec for String {
 
 impl db::OperationsBuilder<(String, String)> for StringKV {
     fn operations(db: &db::Database) -> Box<dyn db::Operations<(String, String)> + '_> {
-        Box::new(db::OperationsImpl::<String, (String, String)> {
-            db: db,
-            custom: &OperationsImpl {},
-        })
+        db::entity_operations::<String, (String, String)>(db, Box::new(IndexHelper {}))
     }
 }
-struct OperationsImpl {}
+struct IndexHelper {}
 
-impl db::OperationsCustom<String, (String, String)> for OperationsImpl {
+impl db::IndexHelper<String, (String, String)> for IndexHelper {
     fn value_index(&self) -> &dyn Index<(String, String)> {
         &StringKV
     }
@@ -78,7 +75,8 @@ impl db::OperationsCustom<String, (String, String)> for OperationsImpl {
     ) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
-    fn from_bytes(&self, _buff: &[u8]) -> Result<(String, String), Box<dyn Error>> {
+    fn from_bytes(&self, buff: &[u8]) -> Result<(String, String), Box<dyn Error>> {
+        dbg!(buff);
         todo!()
     }
 }
