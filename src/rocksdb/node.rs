@@ -35,16 +35,13 @@ impl db::Entity for Node {
 
 impl db::OperationsBuilder<Node> for Node {
     fn operations(db: &db::Database) -> Box<dyn db::Operations<Node> + '_> {
-        Box::new(db::OperationsImpl::<u64, Node> {
-            db: db,
-            custom: &OperationsImpl {},
-        })
+        db::entity_operations::<u64, Node>(db, Box::new(IndexHelper {}))
     }
 }
 
-struct OperationsImpl {}
+struct IndexHelper {}
 
-impl db::OperationsCustom<u64, Node> for OperationsImpl {
+impl db::IndexHelper<u64, Node> for IndexHelper {
     fn value_index(&self) -> &dyn Index<Node> {
         &ById
     }

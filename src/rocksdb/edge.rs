@@ -35,16 +35,13 @@ impl db::Entity for Edge {
 
 impl db::OperationsBuilder<Edge> for Edge {
     fn operations(db: &db::Database) -> Box<dyn db::Operations<Edge> + '_> {
-        Box::new(db::OperationsImpl::<u64, Edge> {
-            db: db,
-            custom: &OperationsImpl {},
-        })
+        db::entity_operations::<u64, Edge>(db, Box::new(IndexHelper {}))
     }
 }
 
-struct OperationsImpl {}
+struct IndexHelper {}
 
-impl db::OperationsCustom<u64, Edge> for OperationsImpl {
+impl db::IndexHelper<u64, Edge> for IndexHelper {
     fn value_index(&self) -> &dyn Index<Edge> {
         &ById
     }
