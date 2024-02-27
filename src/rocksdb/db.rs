@@ -68,7 +68,7 @@ pub trait HasKey<K: KeyCodec> {
     }
 }
 
-pub trait Entity: std::cmp::PartialEq {
+pub trait Entity: std::cmp::PartialEq + std::fmt::Debug {
     const TYPE: &'static str;
     fn as_bytes(&self) -> Vec<u8>;
     fn from_bytes(bytes: &[u8]) -> Result<Self, Box<dyn Error>>
@@ -136,8 +136,14 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
         self.custom.before_put(self.db, o)?;
 
         // Get the old version before the update so we can reindex if needed.
-        let reindex: bool = self.get(o.id())?.unwrap() != *o;
-        trace!("Reindex = {}", reindex);
+        let reindex = match self.get(o.id()) {
+            Ok(Some(current)) => current != *o,
+            Ok(None) => false,
+            Err(e) => {
+                return Err(e);
+            }
+        };
+        trace!("Reindex = {}, o={:?}", reindex, o);
 
         let mut txn = Transaction::default();
         let _: Vec<_> = self
@@ -289,7 +295,7 @@ pub fn type_code(db: &Database, name: &String) -> Result<u64, Box<dyn Error>> {
             let le = v.try_into().unwrap_or_else(|v: Vec<u8>| {
                 panic!("Expected a Vec of length {} but it was {}", 8, v.len())
             });
-            type_code = u64::from_le_bytes(le) + 1;
+            type_code = u64::from_le_bytes(le);
             trace!("type_code read: {}", type_code);
         }
         Ok(None) => {
