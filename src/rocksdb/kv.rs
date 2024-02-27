@@ -71,8 +71,9 @@ impl db::IndexHelper<String, (String, String)> for IndexHelper {
     fn before_put(
         &self,
         _db: &db::Database,
-        _kv: &mut (String, String),
+        kv: &mut (String, String),
     ) -> Result<(), Box<dyn Error>> {
+        dbg!(kv);
         Ok(())
     }
     fn from_bytes(&self, buff: &[u8]) -> Result<(String, String), Box<dyn Error>> {
