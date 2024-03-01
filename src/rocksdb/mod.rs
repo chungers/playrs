@@ -2,6 +2,7 @@
 use tracing::{debug, error, info, trace, warn};
 
 pub mod command;
+mod counter;
 mod db;
 mod edge;
 mod index;

@@ -71,7 +71,7 @@ pub trait HasKey<K: KeyCodec> {
 pub trait Entity: std::cmp::PartialEq + std::fmt::Debug {
     const TYPE: &'static str;
     fn as_bytes(&self) -> Vec<u8>;
-    fn from_bytes(bytes: &[u8]) -> Result<Self, Box<dyn Error>>
+    fn from_bytes(key: &[u8], bytes: &[u8]) -> Result<Self, Box<dyn Error>>
     where
         Self: Sized;
 }

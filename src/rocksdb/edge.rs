@@ -25,7 +25,7 @@ impl db::Entity for Edge {
     fn as_bytes(&self) -> Vec<u8> {
         return self.encode_to_vec();
     }
-    fn from_bytes(bytes: &[u8]) -> Result<Edge, Box<dyn Error>> {
+    fn from_bytes(_key: &[u8], bytes: &[u8]) -> Result<Edge, Box<dyn Error>> {
         match Edge::decode(Cursor::new(bytes)) {
             Ok(edge) => Ok(edge),
             Err(e) => Err(Box::new(e)),

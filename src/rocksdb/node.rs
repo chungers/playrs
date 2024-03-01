@@ -25,7 +25,7 @@ impl db::Entity for Node {
     fn as_bytes(&self) -> Vec<u8> {
         return self.encode_to_vec();
     }
-    fn from_bytes(bytes: &[u8]) -> Result<Node, Box<dyn Error>> {
+    fn from_bytes(_key: &[u8], bytes: &[u8]) -> Result<Node, Box<dyn Error>> {
         match Node::decode(Cursor::new(bytes)) {
             Ok(node) => Ok(node),
             Err(e) => Err(Box::new(e)),
