@@ -1,6 +1,7 @@
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
+use crate::rocksdb::counter;
 use crate::rocksdb::db;
 use crate::rocksdb::db::HasKey;
 use crate::rocksdb::graph::{Edge, Node};
@@ -62,6 +63,7 @@ pub struct Command {
 #[derive(Debug, Subcommand)]
 pub enum Verb {
     Init(InitArgs),
+    Counter(CounterArgs),
     Indexes(IndexesArgs),
     Kv(KvCommand),
     Node(NodeCommand),
@@ -70,6 +72,12 @@ pub enum Verb {
 
 #[derive(Debug, clapArgs)]
 pub struct InitArgs {}
+
+#[derive(Debug, clapArgs)]
+pub struct CounterArgs {
+    /// The key
+    key: String,
+}
 
 #[derive(Debug, clapArgs)]
 pub struct IndexesArgs {}
@@ -195,6 +203,14 @@ pub fn go(cmd: &Command) {
         Verb::Init(args) => {
             trace!("Called start: {:?}", args);
             let result = db::init(&cmd.db, &All);
+            trace!("Result: {:?}", result);
+        }
+        Verb::Counter(args) => {
+            trace!("Called count: {:?}", args);
+            let database = db::open_db(&cmd.db, &All).unwrap();
+            let counters = db::default_counters(&database);
+            let counter = counters.get(args.key.as_str()).unwrap();
+            let result = counter.get();
             trace!("Result: {:?}", result);
         }
         Verb::Indexes(args) => {

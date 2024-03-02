@@ -1,6 +1,7 @@
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
+use crate::rocksdb::counter;
 use crate::rocksdb::index::Index;
 use crate::rocksdb::kv;
 use crate::rocksdb::All;
@@ -112,12 +113,14 @@ pub fn entity_operations<K: KeyCodec + 'static, E: Entity + HasKey<K> + 'static>
     Box::new(OperationsImpl::<K, E> {
         db: db,
         custom: ops,
+        counters: default_counters(db),
     })
 }
 
 struct OperationsImpl<'a, K: KeyCodec, E: Entity + HasKey<K>> {
     db: &'a Database,
     custom: Box<dyn IndexHelper<K, E> + 'a>,
+    counters: counter::Counters<'a>,
 }
 
 impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_, K, E> {
@@ -152,7 +155,13 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
             .iter()
             .map(|index| index.update_entry(self.db, &mut txn, &o))
             .collect();
+
+        // update a counter for the type
+        let mut counter = self.counters.get(E::TYPE)?;
+        counter.set(counter.get() + 1);
+        self.counters.update(&mut txn, &counter)?;
         self.db.write(txn)?;
+
         Ok(o.id())
     }
     fn delete(&self, _o: &E) -> Result<bool, Box<dyn Error>> {
@@ -229,14 +238,20 @@ fn test_check_path() {
 
 static CF_SYSTEM: &str = "cf.system";
 static SEQ_KEY: &str = "sequence";
+static CF_COUNTERS: &str = "cf.system.counters";
 
 // CF for storing type information.
 static CF_SYSTEM_TYPES: &str = "cf.system.types";
+
+pub fn default_counters(db: &Database) -> counter::Counters {
+    counter::Counters::new(db, CF_COUNTERS)
+}
 
 fn all_column_families(builder: &dyn IndexBuilder) -> Vec<String> {
     let mut indexes = builder.cf_names();
     indexes.push(CF_SYSTEM.to_string());
     indexes.push(CF_SYSTEM_TYPES.to_string());
+    indexes.push(CF_COUNTERS.to_string());
     trace!("all_column_families: {:?}", indexes);
     return indexes;
 }
