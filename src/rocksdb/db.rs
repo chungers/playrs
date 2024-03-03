@@ -31,7 +31,10 @@ pub struct Id<E: Entity + ?Sized> {
     phantom: PhantomData<E>,
 }
 
-impl<E: Entity + ?Sized> Id<E> {
+impl<E> Id<E>
+where
+    E: Entity + ?Sized,
+{
     pub fn as_bytes(&self) -> Vec<u8> {
         self.key.to_vec()
     }
@@ -49,23 +52,23 @@ pub trait HasKey<K: KeyCodec> {
         Self: Entity,
         Self: Sized,
     {
-        return Id::<Self> {
+        Id::<Self> {
             key: v.encode_key(),
             phantom: PhantomData::<Self>,
-        };
+        }
     }
     fn id(&self) -> Id<Self>
     where
         Self: Entity,
         Self: Sized,
     {
-        return Id::<Self> {
+        Id::<Self> {
             key: match self.key() {
                 Some(v) => v.encode_key(),
                 None => vec![],
             },
             phantom: PhantomData::<Self>,
-        };
+        }
     }
 }
 
