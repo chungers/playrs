@@ -2,6 +2,7 @@
 use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::counter;
+use crate::rocksdb::error::ErrBadDbPath;
 use crate::rocksdb::index::Index;
 use crate::rocksdb::kv;
 use crate::rocksdb::All;
@@ -12,7 +13,6 @@ use rocksdb::{
 
 use std::convert::TryInto;
 use std::error::Error;
-use std::fmt;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::path::Path;
@@ -177,34 +177,34 @@ pub trait IndexBuilder {
     fn cf_names(&self) -> Vec<String>;
 }
 
-#[derive(Debug, Clone)]
-struct ErrBadDbPath {
-    symlink: bool,
-    path: String,
-}
+// #[derive(Debug, Clone)]
+// struct ErrBadDbPath {
+//     symlink: bool,
+//     path: String,
+// }
 
-impl ErrBadDbPath {
-    fn file(path: &str) -> ErrBadDbPath {
-        ErrBadDbPath {
-            symlink: false,
-            path: path.to_string(),
-        }
-    }
-    fn symlink(path: &str) -> ErrBadDbPath {
-        ErrBadDbPath {
-            symlink: true,
-            path: path.to_string(),
-        }
-    }
-}
+// impl ErrBadDbPath {
+//     fn file(path: &str) -> ErrBadDbPath {
+//         ErrBadDbPath {
+//             symlink: false,
+//             path: path.to_string(),
+//         }
+//     }
+//     fn symlink(path: &str) -> ErrBadDbPath {
+//         ErrBadDbPath {
+//             symlink: true,
+//             path: path.to_string(),
+//         }
+//     }
+// }
 
-impl fmt::Display for ErrBadDbPath {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Bad path {:?}, symlink = {:?}", self.path, self.symlink)
-    }
-}
+// impl fmt::Display for ErrBadDbPath {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         write!(f, "Bad path {:?}, symlink = {:?}", self.path, self.symlink)
+//     }
+// }
 
-impl Error for ErrBadDbPath {}
+// impl Error for ErrBadDbPath {}
 
 fn check_path(path: &str) -> Result<&Path, Box<dyn Error>> {
     let p = Path::new(path);

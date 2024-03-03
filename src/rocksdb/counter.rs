@@ -3,6 +3,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::db;
 use crate::rocksdb::db::{Entity, HasKey};
+use crate::rocksdb::error::ErrNoCounters;
 
 use std::convert::TryInto;
 use std::error::Error;
@@ -84,23 +85,8 @@ impl Counters<'_> {
                 txn.put_cf(cf, counter.id().as_bytes(), counter.as_bytes());
                 Ok(())
             }
-            None => Err(Box::new(ErrNoCounters {
-                cf_name: self.column_family.to_string(),
-            })),
+            None => Err(Box::new(ErrNoCounters::new(self.column_family.to_string()))),
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct ErrNoCounters {
-    cf_name: String,
-}
-
-impl Error for ErrNoCounters {}
-
-impl std::fmt::Display for ErrNoCounters {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Missing column family: {:?}", self.cf_name)
     }
 }
 

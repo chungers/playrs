@@ -5,6 +5,7 @@ pub mod command;
 mod counter;
 mod db;
 mod edge;
+mod error;
 mod index;
 mod kv;
 mod node;
