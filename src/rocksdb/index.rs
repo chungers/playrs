@@ -2,9 +2,9 @@
 use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::db;
+use crate::rocksdb::error::ErrMissingIndex;
 
 use std::error::Error;
-use std::fmt;
 
 pub trait Indexes<E: db::Entity> {
     fn indexes() -> Vec<Box<dyn Index<E>>>;
@@ -12,19 +12,6 @@ pub trait Indexes<E: db::Entity> {
 
 // TODO - fix this. Queries can depend on the Entity...
 pub trait Queries<E: db::Entity> {}
-
-#[derive(Debug, Clone)]
-struct ErrMissingIndex {
-    cf_name: String,
-}
-
-impl Error for ErrMissingIndex {}
-
-impl fmt::Display for ErrMissingIndex {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Missing column family: {:?}", self.cf_name)
-    }
-}
 
 pub trait Index<E: db::Entity> {
     // Name of the column family that backs this index
@@ -63,9 +50,7 @@ pub trait Index<E: db::Entity> {
             }
             None => {
                 trace!("Column family not found: {:?}", self.cf_name());
-                Err(Box::new(ErrMissingIndex {
-                    cf_name: self.cf_name().to_string(),
-                }))
+                Err(Box::new(ErrMissingIndex::new(self.cf_name().to_string())))
             }
         }
     }
@@ -89,9 +74,7 @@ pub trait Index<E: db::Entity> {
             }
             None => {
                 trace!("Column family not found: {:?}", self.cf_name());
-                Err(Box::new(ErrMissingIndex {
-                    cf_name: self.cf_name().to_string(),
-                }))
+                Err(Box::new(ErrMissingIndex::new(self.cf_name().to_string())))
             }
         }
     }

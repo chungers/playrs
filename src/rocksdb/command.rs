@@ -1,7 +1,6 @@
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-use crate::rocksdb::counter;
 use crate::rocksdb::db;
 use crate::rocksdb::db::HasKey;
 use crate::rocksdb::graph::{Edge, Node};
@@ -20,6 +19,7 @@ pub struct DbArgs {
 }
 
 type Err = std::num::ParseIntError;
+
 impl DbArgs {
     fn from_str(s: &str) -> Result<Self, Err> {
         // TODO - Check path for valid rocksdb directory
@@ -28,6 +28,7 @@ impl DbArgs {
         })
     }
 }
+
 impl db::DbInfo for DbArgs {
     fn path(&self) -> &str {
         &self.path
