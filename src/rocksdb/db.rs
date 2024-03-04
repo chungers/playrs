@@ -102,14 +102,14 @@ pub trait Operations<E: Entity> {
     fn delete(&self, e: &E) -> Result<bool, Box<dyn Error>>;
 }
 
-pub trait IndexHelper<K: KeyCodec, E: Entity + HasKey<K>> {
+pub(crate) trait IndexHelper<K: KeyCodec, E: Entity + HasKey<K>> {
     fn value_index(&self) -> &dyn Index<E>;
     fn indexes(&self) -> Vec<Box<dyn Index<E>>>;
     fn before_put(&self, db: &Database, e: &mut E) -> Result<(), Box<dyn Error>>;
     fn from_bytes(&self, buff: &[u8]) -> Result<E, Box<dyn Error>>;
 }
 
-pub fn entity_operations<K: KeyCodec + 'static, E: Entity + HasKey<K> + 'static>(
+pub(crate) fn entity_operations<K: KeyCodec + 'static, E: Entity + HasKey<K> + 'static>(
     db: &Database,
     ops: Box<dyn IndexHelper<K, E>>,
 ) -> Box<dyn Operations<E> + '_> {
@@ -245,6 +245,7 @@ static CF_COUNTERS: &str = "cf.system.counters";
 
 // CF for storing type information.
 static CF_SYSTEM_TYPES: &str = "cf.system.types";
+static COUNT_TYPES: &str = "counter.types";
 
 pub fn default_counters(db: &Database) -> counter::Counters {
     counter::Counters::new(db, CF_COUNTERS)
@@ -309,31 +310,41 @@ pub fn type_code(db: &Database, name: &String) -> Result<u64, Box<dyn Error>> {
     let type_code: u64;
     let cf = db.cf_handle(CF_SYSTEM_TYPES).unwrap();
     match db.get_cf(cf, name.as_bytes()) {
+        Err(e) => {
+            error!("Error retrieving value for {}: {}", name, e);
+            return Err(Box::new(e));
+        }
+
         Ok(Some(v)) => {
             let le = v.try_into().unwrap_or_else(|v: Vec<u8>| {
                 panic!("Expected a Vec of length {} but it was {}", 8, v.len())
             });
             type_code = u64::from_le_bytes(le);
             trace!("type_code read: {}", type_code);
+            Ok(type_code)
         }
+
         Ok(None) => {
-            type_code = 1;
-        }
-        Err(e) => {
-            error!("Error retrieving value for {}: {}", name, e);
-            return Err(Box::new(e));
-        }
-    }
+            // The type code is simply the count of types + 1 (> 0)
+            let mut counters = default_counters(db);
+            let mut counter = counters.get(COUNT_TYPES)?;
+            type_code = counter.get() + 1;
 
-    // BUG: type code is always 1 since we are not counting the number of types/ rows
-    // TODO: update a counter to track the number of rows in the types table/cf.
+            // Note starting a separate txn from the put of the object.
+            // This only updates two cf's: the counters and type/symbol tables.
+            let mut txn = Transaction::default();
 
-    // update the id before returning the value
-    match db.put_cf(cf, name.as_bytes(), type_code.to_le_bytes().to_vec()) {
-        Ok(()) => Ok(type_code),
-        Err(e) => {
-            error!("Error updating sequence {}", SEQ_KEY);
-            Err(Box::new(e))
+            // Update the number of rows in the types table/cf.
+            counter.set(type_code);
+            counters.update(&mut txn, &counter)?;
+            txn.put_cf(cf, name.as_bytes(), type_code.to_le_bytes().to_vec());
+            match db.write(txn) {
+                Ok(()) => Ok(type_code),
+                Err(e) => {
+                    error!("Error updating type codes {:?}", e);
+                    Err(Box::new(e))
+                }
+            }
         }
     }
 }
