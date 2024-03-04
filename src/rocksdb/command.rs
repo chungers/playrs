@@ -140,6 +140,11 @@ pub enum NodeVerb {
 pub struct NodePutArgs {
     /// The name of the node
     name: String,
+
+    /// The type name of the node
+    #[clap(long = "type")]
+    type_name: Option<String>,
+
     /// The description of the node
     description: Option<String>,
     /// The id of the node
@@ -173,6 +178,11 @@ pub struct EdgePutArgs {
     tail: u64,
     /// The name of the edge / relation
     name: String,
+
+    /// The type name of the edge
+    #[clap(long = "type")]
+    type_name: Option<String>,
+
     /// The id of the node
     #[clap(long = "id")]
     id: Option<u64>,
@@ -263,7 +273,10 @@ pub fn go(cmd: &Command) {
                     };
                     let mut node = Node {
                         id: id,
-                        type_name: args.name.clone(),
+                        type_name: match &args.type_name {
+                            Some(v) => v.to_string(),
+                            None => "entity".to_string(),
+                        },
                         type_code: 0,
                         name: args.name.clone(),
                         doc: vec![],
@@ -306,7 +319,10 @@ pub fn go(cmd: &Command) {
                         id: id,
                         head: args.head,
                         tail: args.tail,
-                        type_name: args.name.clone(),
+                        type_name: match &args.type_name {
+                            Some(v) => v.to_string(),
+                            None => "relation".to_string(),
+                        },
                         type_code: 0,
                         name: args.name.clone(),
                         doc: vec![],
