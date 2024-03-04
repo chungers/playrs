@@ -35,19 +35,10 @@ impl db::Entity for (String, String) {
         self.1.as_bytes().to_vec()
     }
     fn from_bytes(key: &[u8], bytes: &[u8]) -> Result<(String, String), Box<dyn Error>> {
-        let p1 = match String::from_utf8(key.to_vec()) {
-            Ok(s) => s.clone(),
-            Err(e) => {
-                return Err(Box::new(e));
-            }
-        };
-        let p2 = match String::from_utf8(bytes.to_vec()) {
-            Ok(s) => s.clone(),
-            Err(e) => {
-                return Err(Box::new(e));
-            }
-        };
-        Ok((p1, p2))
+        Ok((
+            String::from_utf8(key.to_vec())?,
+            String::from_utf8(bytes.to_vec())?,
+        ))
     }
 }
 
