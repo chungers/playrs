@@ -20,16 +20,6 @@ pub trait Index<E: db::Entity> {
     // Returns the (key, value) for the index
     fn key_value(&self, e: &E) -> (Vec<u8>, Vec<u8>);
 
-    // TODO -
-    // Index keys can change based on the fields changed.
-    // If we had index on obj.foo and obj.bar and now we have
-    // obj.foo' and obj.bar', we need to 1) remove the index
-    // keyed by (obj.foo, obj.bar) and add (obj.foo', obj.bar').
-    // This means we need to have a copy of the old value of e.
-    // Under the covers, before updating the value index, which
-    // stores (id, value), we have to read the old value and then
-    // remove the index entry at (value.foo, value.bar) and the
-    // add the index entry at (value.foo', value.bar').
     fn update_entry(
         &self,
         db: &db::Database,
