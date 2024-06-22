@@ -141,17 +141,39 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
     fn put(&mut self, o: &mut E) -> Result<Id<E>, Box<dyn Error>> {
         self.custom.before_put(self.db, o)?;
 
-        // Get the old version before the update so we can reindex if needed.
-        let reindex = match self.get(o.id()) {
-            Ok(Some(current)) => current != *o,
-            Ok(None) => false,
+        // Index keys can change based on the fields changed.
+        // If we had index on obj.foo and obj.bar and now we have
+        // obj.foo' and obj.bar', we need to 1) remove the index
+        // keyed by (obj.foo, obj.bar) and add (obj.foo', obj.bar').
+        // This means we need to have a copy of the old value of e.
+        // Under the covers, before updating the value index, which
+        // stores (id, value), we have to read the old value and then
+        // remove the index entry at (value.foo, value.bar) and the
+        // add the index entry at (value.foo', value.bar').
+
+        let mut txn = Transaction::default();
+
+        match self.get(o.id()) {
+            Ok(Some(found)) => {
+                let _: Vec<_> = self
+                    .custom
+                    .indexes()
+                    .iter()
+                    .map(|index| {
+                        let _ = index.delete_entry(self.db, &mut txn, &found);
+                        trace!("Scheduled deletion old={:?} new={:?}", found, o);
+                    })
+                    .collect();
+            }
+            Ok(None) => {
+                trace!("No value read with id={:?}", o.id());
+            }
             Err(e) => {
                 return Err(e);
             }
-        };
-        trace!("Reindex = {}, o={:?}", reindex, o);
+        }
 
-        let mut txn = Transaction::default();
+        // Index the new value
         let _: Vec<_> = self
             .custom
             .indexes()

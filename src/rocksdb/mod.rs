@@ -29,6 +29,7 @@ impl db::IndexBuilder for All {
             node::ByType.cf_name().into(),
             edge::ByType.cf_name().into(),
             edge::ByHeadTail.cf_name().into(),
+            edge::ByTailHead.cf_name().into(),
         ]
     }
 }

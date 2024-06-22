@@ -134,6 +134,8 @@ pub struct NodeCommand {
 pub enum NodeVerb {
     Put(NodePutArgs),
     Get(NodeGetArgs),
+    List(NodeListArgs),
+    ListEdges(NodeListEdgesArgs),
 }
 
 #[derive(Debug, clapArgs)]
@@ -159,6 +161,25 @@ pub struct NodeGetArgs {
 }
 
 #[derive(Debug, clapArgs)]
+pub struct NodeListArgs {
+    /// The start of id range
+    start_id: u64,
+
+    /// The end of id range
+    end_id: u64,
+}
+
+#[derive(Debug, clapArgs)]
+pub struct NodeListEdgesArgs {
+    /// The direction of the edge
+    #[clap(long = "to")]
+    to: bool,
+
+    /// The id of the node
+    id: u64,
+}
+
+#[derive(Debug, clapArgs)]
 pub struct EdgeCommand {
     #[clap(subcommand)]
     verb: EdgeVerb,
@@ -168,6 +189,7 @@ pub struct EdgeCommand {
 pub enum EdgeVerb {
     Put(EdgePutArgs),
     Get(EdgeGetArgs),
+    List(EdgeListArgs),
 }
 
 #[derive(Debug, clapArgs)]
@@ -191,6 +213,15 @@ pub struct EdgePutArgs {
 #[derive(Debug, clapArgs)]
 pub struct EdgeGetArgs {
     /// The id of the node
+    id: u64,
+}
+
+#[derive(Debug, clapArgs)]
+pub struct EdgeListArgs {
+    /// List all edges to the node id
+    #[clap(long = "to")]
+    to: bool,
+    /// List by the id of the node
     id: u64,
 }
 
@@ -304,6 +335,15 @@ pub fn go(cmd: &Command) {
                         }
                     }
                 }
+                NodeVerb::List(args) => {
+                    info!(
+                        "TODO - List nodes from range [{:?}, {:?}]",
+                        args.start_id, args.end_id
+                    );
+                }
+                NodeVerb::ListEdges(args) => {
+                    info!("TODO - List edges of node {:?}, args {:?}", args.id, args);
+                }
             }
         }
         Verb::Edge(ncmd) => {
@@ -348,6 +388,9 @@ pub fn go(cmd: &Command) {
                             error!("Error: {:?}", e);
                         }
                     }
+                }
+                EdgeVerb::List(args) => {
+                    info!("TODO - List edges by {:?}", args);
                 }
             }
         }
