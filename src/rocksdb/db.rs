@@ -450,3 +450,21 @@ pub fn list(info: &dyn DbInfo, key: &str, visitor: &dyn VisitKV) -> Result<(), B
     }
     Ok(())
 }
+
+pub fn list_index(
+    info: &dyn DbInfo,
+    index: &str,
+    visitor: &dyn VisitKV,
+) -> Result<(), Box<dyn Error>> {
+    trace!("List path={}, key={}", info.path(), index);
+    let db = open_db(info, &All)?;
+    trace!("DB = {:?}", db);
+
+    let cf = db.cf_handle(index).unwrap();
+    let iter = db.iterator_cf(cf, IteratorMode::From("".as_bytes(), Direction::Forward));
+    for item in iter {
+        let (k, v) = item.unwrap();
+        visitor.visit(&k, &v);
+    }
+    Ok(())
+}

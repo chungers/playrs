@@ -65,7 +65,7 @@ pub struct Command {
 pub enum Verb {
     Init(InitArgs),
     Counter(CounterArgs),
-    Indexes(IndexesArgs),
+    Index(IndexCommand),
     Kv(KvCommand),
     Node(NodeCommand),
     Edge(EdgeCommand),
@@ -81,7 +81,22 @@ pub struct CounterArgs {
 }
 
 #[derive(Debug, clapArgs)]
-pub struct IndexesArgs {}
+pub struct IndexCommand {
+    #[clap(subcommand)]
+    verb: IndexVerb,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum IndexVerb {
+    All,
+    Dump(IndexArgs),
+}
+
+#[derive(Debug, clapArgs)]
+pub struct IndexArgs {
+    /// The key
+    index: String,
+}
 
 #[derive(Debug, clapArgs)]
 pub struct KvCommand {
@@ -255,11 +270,21 @@ pub fn go(cmd: &Command) {
             let result = counter.get();
             trace!("Result: {:?}", result);
         }
-        Verb::Indexes(args) => {
-            trace!("List Indexes (column families): {:?}", args);
-            let result = db::indexes(&cmd.db);
-            trace!("Result: {:?}", result);
-            println!("{:?}", result);
+        Verb::Index(indexcmd) => {
+            trace!("Called Indexes: {:?}", indexcmd);
+
+            match &indexcmd.verb {
+                IndexVerb::All => {
+                    let result = db::indexes(&cmd.db);
+                    trace!("Result: {:?}", result);
+                    println!("{:?}", result);
+                }
+                IndexVerb::Dump(args) => {
+                    trace!("Dump index content: {:?}", args);
+                    let result = db::list_index(&cmd.db, &args.index, &visit);
+                    trace!("Result: {:?}", result);
+                }
+            }
         }
 
         Verb::Kv(kvcmd) => {
