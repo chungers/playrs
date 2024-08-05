@@ -43,7 +43,7 @@ impl Error for ErrMissingIndex {}
 
 impl ErrMissingIndex {
     pub fn new(cf_name: String) -> ErrMissingIndex {
-        ErrMissingIndex { cf_name: cf_name }
+        ErrMissingIndex { cf_name }
     }
 }
 
@@ -60,7 +60,7 @@ pub struct ErrNoCounters {
 
 impl ErrNoCounters {
     pub fn new(cf_name: String) -> ErrNoCounters {
-        ErrNoCounters { cf_name: cf_name }
+        ErrNoCounters { cf_name }
     }
 }
 impl Error for ErrNoCounters {}
@@ -70,3 +70,26 @@ impl std::fmt::Display for ErrNoCounters {
         write!(f, "Missing column family: {:?}", self.cf_name)
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct ErrBadIndex {
+    cf_name: String,
+    key: Vec<u8>,
+}
+
+impl ErrBadIndex {
+    pub fn new(cf_name: String, key: &[u8]) -> ErrBadIndex {
+        ErrBadIndex {
+            cf_name,
+            key: key.to_vec(),
+        }
+    }
+}
+
+impl fmt::Display for ErrBadIndex {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Bad index: {:?}, key={:?}", self.cf_name, self.key)
+    }
+}
+
+impl Error for ErrBadIndex {}

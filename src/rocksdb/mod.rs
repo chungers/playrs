@@ -1,3 +1,4 @@
+use graph::Node;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
@@ -18,18 +19,18 @@ mod server;
 #[derive(Debug, Clone, PartialEq)]
 pub struct All;
 
-use crate::rocksdb::index::Index; // use here to access to cf_name() method on index.
+use crate::rocksdb::graph::Edge;
+use crate::rocksdb::index::{Index, Indexes}; // use here to access to cf_name() method on index.
 
 impl db::IndexBuilder for All {
     fn cf_names(&self) -> Vec<String> {
-        vec![
-            kv::StringKV.cf_name().into(),
-            node::ById.cf_name().into(),
-            edge::ById.cf_name().into(),
-            node::ByType.cf_name().into(),
-            edge::ByType.cf_name().into(),
-            edge::ByHeadTail.cf_name().into(),
-            edge::ByTailHead.cf_name().into(),
-        ]
+        let mut cfs = Vec::<String>::from(vec![kv::StringKV.cf_name().into()]);
+        for i in Node::indexes().iter() {
+            cfs.push(i.cf_name().to_string());
+        }
+        for i in Edge::indexes().iter() {
+            cfs.push(i.cf_name().to_string());
+        }
+        cfs
     }
 }

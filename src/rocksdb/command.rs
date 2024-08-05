@@ -1,10 +1,11 @@
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-use crate::rocksdb::db;
-use crate::rocksdb::db::HasKey;
+use crate::rocksdb::db::{self, HasKey, Visitor};
+use crate::rocksdb::edge::EdgePrinter;
 use crate::rocksdb::graph::{Edge, Node};
 use crate::rocksdb::kv;
+use crate::rocksdb::node::NodePrinter;
 use crate::rocksdb::All;
 
 use crate::rocksdb::db::OperationsBuilder;
@@ -151,6 +152,7 @@ pub enum NodeVerb {
     Get(NodeGetArgs),
     List(NodeListArgs),
     ListEdges(NodeListEdgesArgs),
+    Index(NodeIndexArgs),
 }
 
 #[derive(Debug, clapArgs)]
@@ -176,12 +178,21 @@ pub struct NodeGetArgs {
 }
 
 #[derive(Debug, clapArgs)]
+pub struct NodeIndexArgs {
+    /// The name of the index
+    index: String,
+
+    /// Match bytes
+    match_string: String,
+}
+
+#[derive(Debug, clapArgs)]
 pub struct NodeListArgs {
     /// The start of id range
     start_id: u64,
 
-    /// The end of id range
-    end_id: u64,
+    /// How many to list
+    n: u32,
 }
 
 #[derive(Debug, clapArgs)]
@@ -233,16 +244,14 @@ pub struct EdgeGetArgs {
 
 #[derive(Debug, clapArgs)]
 pub struct EdgeListArgs {
-    /// List all edges to the node id
-    #[clap(long = "to")]
-    to: bool,
-    /// List by the id of the node
-    id: u64,
+    /// List all edges starting at id
+    start_id: u64,
+    /// How many to list
+    n: u32,
 }
 
-struct Visitor(i32);
-
-impl db::VisitKV for Visitor {
+struct KvVisitor(i32);
+impl db::VisitKV for KvVisitor {
     fn visit(&self, k: &[u8], v: &[u8]) {
         println!(
             "k={:?}, v={:?}",
@@ -252,9 +261,21 @@ impl db::VisitKV for Visitor {
     }
 }
 
+struct BytesVisitor;
+impl db::VisitKV for BytesVisitor {
+    fn visit(&self, k: &[u8], v: &[u8]) {
+        println!(
+            "{:?} [{:?}] | {:?}",
+            String::from_utf8(k.to_vec()).unwrap(),
+            k,
+            v
+        );
+    }
+}
+
 pub fn go(cmd: &Command) {
     trace!("Running command: {:?}", cmd);
-    let visit = Visitor(0);
+    let visit = KvVisitor(0);
 
     match &cmd.verb {
         Verb::Init(args) => {
@@ -281,7 +302,7 @@ pub fn go(cmd: &Command) {
                 }
                 IndexVerb::Dump(args) => {
                     trace!("Dump index content: {:?}", args);
-                    let result = db::list_index(&cmd.db, &args.index, &visit);
+                    let result = db::list_index(&cmd.db, &args.index, &BytesVisitor);
                     trace!("Result: {:?}", result);
                 }
             }
@@ -328,14 +349,14 @@ pub fn go(cmd: &Command) {
                         None => 0,
                     };
                     let mut node = Node {
-                        id: id,
+                        id,
                         type_name: match &args.type_name {
                             Some(v) => v.to_string(),
                             None => "entity".to_string(),
                         },
                         type_code: 0,
                         name: args.name.clone(),
-                        doc: vec![],
+                        cas: "".into(),
                     };
 
                     let mut ops = Node::operations(&database);
@@ -350,7 +371,8 @@ pub fn go(cmd: &Command) {
                     trace!("Result: {:?}", result);
                     match result {
                         Ok(Some(node)) => {
-                            info!("{:?}", node);
+                            let p = NodePrinter;
+                            p.visit(node);
                         }
                         Ok(None) => {
                             info!("not found");
@@ -361,10 +383,28 @@ pub fn go(cmd: &Command) {
                     }
                 }
                 NodeVerb::List(args) => {
-                    info!(
-                        "TODO - List nodes from range [{:?}, {:?}]",
-                        args.start_id, args.end_id
-                    );
+                    info!("List {:?} nodes from id={:?}", args.n, args.start_id,);
+                    let ops = Node::operations(&database);
+                    match ops.visit(Node::id_from(args.start_id), Box::new(NodePrinter)) {
+                        Ok(()) => {
+                            info!("Done");
+                        }
+                        Err(e) => {
+                            error!("Error: {:?}", e);
+                        }
+                    }
+                }
+                NodeVerb::Index(args) => {
+                    trace!("Lookup by index: {:?}", args);
+                    let ops = Node::operations(&database);
+                    match ops.index_scan(
+                        &args.index,
+                        args.match_string.as_bytes(),
+                        Box::new(NodePrinter),
+                    ) {
+                        Ok(()) => info!("Done"),
+                        Err(e) => error!("Error: {:?}", e),
+                    };
                 }
                 NodeVerb::ListEdges(args) => {
                     info!("TODO - List edges of node {:?}, args {:?}", args.id, args);
@@ -381,7 +421,7 @@ pub fn go(cmd: &Command) {
                         None => 0,
                     };
                     let mut edge = Edge {
-                        id: id,
+                        id,
                         head: args.head,
                         tail: args.tail,
                         type_name: match &args.type_name {
@@ -390,7 +430,7 @@ pub fn go(cmd: &Command) {
                         },
                         type_code: 0,
                         name: args.name.clone(),
-                        doc: vec![],
+                        cas: String::from(""),
                     };
                     let mut ops = Edge::operations(&database);
                     let result = ops.put(&mut edge);
@@ -404,7 +444,8 @@ pub fn go(cmd: &Command) {
                     trace!("Result: {:?}", result);
                     match result {
                         Ok(Some(edge)) => {
-                            info!("{:?}", edge);
+                            let p = EdgePrinter;
+                            p.visit(edge);
                         }
                         Ok(None) => {
                             info!("not found");
@@ -415,7 +456,16 @@ pub fn go(cmd: &Command) {
                     }
                 }
                 EdgeVerb::List(args) => {
-                    info!("TODO - List edges by {:?}", args);
+                    trace!("List edges: {:?}", args);
+                    let ops = Edge::operations(&database);
+                    match ops.visit(Edge::id_from(args.start_id), Box::new(EdgePrinter)) {
+                        Ok(()) => {
+                            info!("Done");
+                        }
+                        Err(e) => {
+                            error!("Error: {:?}", e);
+                        }
+                    }
                 }
             }
         }
