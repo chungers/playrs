@@ -7,7 +7,7 @@ message Node {
     uint64 type_code = 2;
     string type_name = 3;
     string name = 4;
-    repeated uint64 doc = 5;
+    string cas = 5;
 }
 
 message Edge {
@@ -17,13 +17,5 @@ message Edge {
     string name = 4;
     uint64 head = 5;
     uint64 tail = 6;
-    repeated uint64 doc = 7;
-}
-
-message Document {
-    uint64 id = 1;
-    map<string, string> metadata = 2;
-    string content_type = 3;
-    uint64 content_size = 4;
-    bytes content = 5;
+    string cas = 7;
 }

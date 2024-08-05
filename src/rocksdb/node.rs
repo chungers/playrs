@@ -36,6 +36,14 @@ impl db::OperationsBuilder<Node> for Node {
     }
 }
 
+pub struct NodePrinter;
+
+impl db::Visitor<Node> for NodePrinter {
+    fn visit(&self, entity: Node) -> bool {
+        println!("{:?}", entity);
+        true
+    }
+}
 struct IndexHelper {}
 
 impl db::IndexHelper<u64, Node> for IndexHelper {
@@ -64,6 +72,8 @@ impl Indexes<Node> for Node {
             Box::new(ById),
             // By type code
             Box::new(ByType),
+            // By name
+            Box::new(ByName),
         ];
     }
 }
@@ -79,6 +89,9 @@ pub struct ById;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ByType;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ByName;
 
 impl Index<Node> for ById {
     fn cf_name(&self) -> &'static str {
@@ -103,6 +116,23 @@ impl Index<Node> for ByType {
     }
 }
 
+impl Index<Node> for ByName {
+    fn cf_name(&self) -> &'static str {
+        "index.node.name"
+    }
+    fn key_value(&self, n: &Node) -> (Vec<u8>, Vec<u8>) {
+        trace!(
+            "key_value = [{:?}, {:?}={:?}], obj={:?}",
+            n.name,
+            n.id,
+            n.id.to_le_bytes().to_vec(),
+            n
+        );
+        //       (n.name.encode_to_vec(), n.id.to_le_bytes().to_vec())
+        (n.name.as_bytes().to_vec(), n.id.to_le_bytes().to_vec())
+    }
+}
+
 #[test]
 fn test_using_node_indexes() {
     let mut cfs: Vec<&str> = Vec::<&str>::new();
@@ -123,7 +153,7 @@ fn test_using_node_indexes() {
             type_name: "foo".into(),
             type_code: 2u64,
             name: "foo".into(),
-            doc: vec![],
+            cas: "".into(),
         })
     );
 }
@@ -135,7 +165,7 @@ fn test_using_node_id() {
         type_name: "foo".into(),
         type_code: 2u64,
         name: "foo".into(),
-        doc: vec![],
+        cas: "".into(),
     };
 
     use db::HasKey;

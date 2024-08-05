@@ -10,9 +10,6 @@ pub trait Indexes<E: db::Entity> {
     fn indexes() -> Vec<Box<dyn Index<E>>>;
 }
 
-// TODO - fix this. Queries can depend on the Entity...
-pub trait Queries<E: db::Entity> {}
-
 pub trait Index<E: db::Entity> {
     // Name of the column family that backs this index
     fn cf_name(&self) -> &'static str;

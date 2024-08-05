@@ -9,7 +9,6 @@ use crate::rocksdb::index::{Index, Indexes};
 
 use std::error::Error;
 use std::io::Cursor;
-
 impl db::HasKey<u64> for Edge {
     fn key(&self) -> Option<u64> {
         if self.id > 0 {
@@ -36,6 +35,13 @@ impl db::OperationsBuilder<Edge> for Edge {
     }
 }
 
+pub struct EdgePrinter;
+impl db::Visitor<Edge> for EdgePrinter {
+    fn visit(&self, entity: Edge) -> bool {
+        println!("{:?}", entity);
+        true
+    }
+}
 struct IndexHelper {}
 
 impl db::IndexHelper<u64, Edge> for IndexHelper {
@@ -64,6 +70,8 @@ impl Indexes<Edge> for Edge {
             Box::new(ById),
             // By type code
             Box::new(ByType),
+            // By Name
+            Box::new(ByName),
             // By head, tail
             Box::new(ByHeadTail),
             // By tail, head
@@ -77,6 +85,9 @@ pub struct ById;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ByType;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ByName;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ByHeadTail;
@@ -110,6 +121,15 @@ impl Index<Edge> for ByType {
             e.type_code.to_le_bytes().to_vec(),
             e.id.to_le_bytes().to_vec(),
         )
+    }
+}
+
+impl Index<Edge> for ByName {
+    fn cf_name(&self) -> &'static str {
+        "index.edge.name"
+    }
+    fn key_value(&self, e: &Edge) -> (Vec<u8>, Vec<u8>) {
+        (e.name.encode_to_vec(), e.id.to_le_bytes().to_vec())
     }
 }
 
@@ -157,7 +177,7 @@ fn test_using_edge_indexes() {
             type_name: "foo".into(),
             type_code: 3u64,
             name: "foo".into(),
-            doc: vec![],
+            cas: "".into(),
         })
     );
 }

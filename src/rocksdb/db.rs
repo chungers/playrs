@@ -2,7 +2,7 @@
 use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::counter;
-use crate::rocksdb::error::ErrBadDbPath;
+use crate::rocksdb::error::{ErrBadDbPath, ErrBadIndex};
 use crate::rocksdb::index::Index;
 use crate::rocksdb::kv;
 use crate::rocksdb::All;
@@ -100,6 +100,14 @@ pub trait Operations<E: Entity> {
     fn get(&self, id: Id<E>) -> Result<Option<E>, Box<dyn Error>>;
     fn put(&mut self, e: &mut E) -> Result<Id<E>, Box<dyn Error>>;
     fn delete(&self, e: &E) -> Result<bool, Box<dyn Error>>;
+    fn visit(&self, start_id: Id<E>, visitor: Box<dyn Visitor<E>>) -> Result<(), Box<dyn Error>>;
+    fn index_first(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>>;
+    fn index_scan(
+        &self,
+        index: &String,
+        match_start: &[u8],
+        visitor: Box<dyn Visitor<E>>,
+    ) -> Result<(), Box<dyn Error>>;
 }
 
 pub(crate) trait IndexHelper<K: KeyCodec, E: Entity + HasKey<K>> {
@@ -114,7 +122,7 @@ pub(crate) fn entity_operations<K: KeyCodec + 'static, E: Entity + HasKey<K> + '
     ops: Box<dyn IndexHelper<K, E>>,
 ) -> Box<dyn Operations<E> + '_> {
     Box::new(OperationsImpl::<K, E> {
-        db: db,
+        db,
         custom: ops,
         counters: default_counters(db),
     })
@@ -192,6 +200,77 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
     fn delete(&self, _o: &E) -> Result<bool, Box<dyn Error>> {
         todo!()
     }
+
+    fn visit(&self, start_id: Id<E>, visitor: Box<dyn Visitor<E>>) -> Result<(), Box<dyn Error>> {
+        trace!("visit from {:?}", start_id);
+        let cf = self
+            .db
+            .cf_handle(self.custom.value_index().cf_name())
+            .unwrap();
+        let iter = self.db.iterator_cf(
+            cf,
+            IteratorMode::From(start_id.as_bytes().as_slice(), Direction::Forward),
+        );
+        for item in iter {
+            let (k, v) = item.unwrap();
+            let entity = E::from_bytes(&k, &v)?;
+            if !visitor.visit(entity) {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    fn index_first(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>> {
+        let cf = self.db.cf_handle(index.as_str()).unwrap();
+        match self.db.get_cf(cf, match_bytes) {
+            Ok(Some(bytes)) => {
+                let id = E::id_from(KeyCodec::decode_key(bytes));
+                self.get(id)
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(Box::new(e)),
+        }
+    }
+
+    fn index_scan(
+        &self,
+        index: &String,
+        match_start: &[u8],
+        visitor: Box<dyn Visitor<E>>,
+    ) -> Result<(), Box<dyn Error>> {
+        let cf = self.db.cf_handle(index.as_str()).unwrap();
+        trace!("Found cf {:?} with match={:?}", index, match_start);
+        let iter = self
+            .db
+            .iterator_cf(cf, IteratorMode::From(match_start, Direction::Forward));
+        for item in iter {
+            let (k, v) = item.unwrap();
+            // compare k with the match_start bytes.  If the bytes don't match <bytes>.* then stop
+            if k.len() >= match_start.len() && match_start.to_owned() != k[0..match_start.len()] {
+                break;
+            }
+            if v.len() > 0 {
+                trace!("For match={:?}, (k,v)={:?} | {:?}", match_start, k, v);
+                let id = E::id_from(KeyCodec::decode_key(v.to_vec()));
+                let stop: Result<bool, Box<dyn Error>> = match self.get(id)? {
+                    Some(obj) => Ok(!visitor.visit(obj)),
+                    None => {
+                        error!("Bad index!!! {:?}", ErrBadIndex::new(index.clone(), &v));
+                        Err(Box::new(ErrBadIndex::new(index.clone(), &v)))
+                    }
+                };
+                if stop? {
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+pub trait Visitor<E: Entity> {
+    fn visit(&self, entity: E) -> bool;
 }
 
 pub trait VisitKV {
@@ -201,35 +280,6 @@ pub trait VisitKV {
 pub trait IndexBuilder {
     fn cf_names(&self) -> Vec<String>;
 }
-
-// #[derive(Debug, Clone)]
-// struct ErrBadDbPath {
-//     symlink: bool,
-//     path: String,
-// }
-
-// impl ErrBadDbPath {
-//     fn file(path: &str) -> ErrBadDbPath {
-//         ErrBadDbPath {
-//             symlink: false,
-//             path: path.to_string(),
-//         }
-//     }
-//     fn symlink(path: &str) -> ErrBadDbPath {
-//         ErrBadDbPath {
-//             symlink: true,
-//             path: path.to_string(),
-//         }
-//     }
-// }
-
-// impl fmt::Display for ErrBadDbPath {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         write!(f, "Bad path {:?}, symlink = {:?}", self.path, self.symlink)
-//     }
-// }
-
-// impl Error for ErrBadDbPath {}
 
 fn check_path(path: &str) -> Result<&Path, Box<dyn Error>> {
     let p = Path::new(path);
