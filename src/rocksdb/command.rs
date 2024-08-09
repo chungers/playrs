@@ -185,6 +185,8 @@ pub struct NodeGetArgs {
 pub struct NodeByNameArgs {
     /// Match bytes
     match_string: String,
+    /// How many to return.  1 == exact match.
+    n: u32,
 }
 
 #[derive(Debug, clapArgs)]
@@ -405,6 +407,7 @@ pub fn go(cmd: &Command) {
                     match ops.match_bytes(
                         &node::ByName.cf_name().to_string(),
                         args.match_string.as_bytes(),
+                        args.n,
                     ) {
                         Ok(matches) => {
                             let c = matches.len();
