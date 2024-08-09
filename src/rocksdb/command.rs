@@ -4,7 +4,9 @@ use tracing::{debug, error, info, trace, warn};
 use crate::rocksdb::db::{self, HasKey, Visitor};
 use crate::rocksdb::edge::EdgePrinter;
 use crate::rocksdb::graph::{Edge, Node};
+use crate::rocksdb::index::Index;
 use crate::rocksdb::kv;
+use crate::rocksdb::node;
 use crate::rocksdb::node::NodePrinter;
 use crate::rocksdb::All;
 
@@ -12,6 +14,7 @@ use crate::rocksdb::db::OperationsBuilder;
 
 use clap::{Args as clapArgs, Subcommand};
 use rocksdb::Options;
+use std::default::Default;
 
 #[derive(Debug, clapArgs, PartialEq, Eq)]
 pub struct DbArgs {
@@ -152,7 +155,8 @@ pub enum NodeVerb {
     Get(NodeGetArgs),
     List(NodeListArgs),
     ListEdges(NodeListEdgesArgs),
-    Index(NodeIndexArgs),
+    ByName(NodeByNameArgs),
+    First(NodeFirstArgs),
 }
 
 #[derive(Debug, clapArgs)]
@@ -178,7 +182,13 @@ pub struct NodeGetArgs {
 }
 
 #[derive(Debug, clapArgs)]
-pub struct NodeIndexArgs {
+pub struct NodeByNameArgs {
+    /// Match bytes
+    match_string: String,
+}
+
+#[derive(Debug, clapArgs)]
+pub struct NodeFirstArgs {
     /// The name of the index
     index: String,
 
@@ -264,12 +274,7 @@ impl db::VisitKV for KvVisitor {
 struct BytesVisitor;
 impl db::VisitKV for BytesVisitor {
     fn visit(&self, k: &[u8], v: &[u8]) {
-        println!(
-            "{:?} [{:?}] | {:?}",
-            String::from_utf8(k.to_vec()).unwrap(),
-            k,
-            v
-        );
+        println!("[{:?}] | {:?}", k, v);
     }
 }
 
@@ -371,7 +376,7 @@ pub fn go(cmd: &Command) {
                     trace!("Result: {:?}", result);
                     match result {
                         Ok(Some(node)) => {
-                            let p = NodePrinter;
+                            let mut p = NodePrinter(1);
                             p.visit(node);
                         }
                         Ok(None) => {
@@ -385,7 +390,7 @@ pub fn go(cmd: &Command) {
                 NodeVerb::List(args) => {
                     info!("List {:?} nodes from id={:?}", args.n, args.start_id,);
                     let ops = Node::operations(&database);
-                    match ops.visit(Node::id_from(args.start_id), Box::new(NodePrinter)) {
+                    match ops.visit(Node::id_from(args.start_id), Box::new(NodePrinter(args.n))) {
                         Ok(()) => {
                             info!("Done");
                         }
@@ -394,17 +399,31 @@ pub fn go(cmd: &Command) {
                         }
                     }
                 }
-                NodeVerb::Index(args) => {
+                NodeVerb::ByName(args) => {
                     trace!("Lookup by index: {:?}", args);
                     let ops = Node::operations(&database);
-                    match ops.index_scan(
-                        &args.index,
+                    match ops.match_bytes(
+                        &node::ByName.cf_name().to_string(),
                         args.match_string.as_bytes(),
-                        Box::new(NodePrinter),
                     ) {
-                        Ok(()) => info!("Done"),
+                        Ok(matches) => {
+                            let c = matches.len();
+                            for n in matches {
+                                println!("{:?}", n);
+                            }
+                            info!("Done ({:?})", c);
+                        }
                         Err(e) => error!("Error: {:?}", e),
                     };
+                }
+                NodeVerb::First(args) => {
+                    trace!("First in index: {:?}", args);
+                    let ops = Node::operations(&database);
+                    match ops.first(&args.index, args.match_string.as_bytes()) {
+                        Ok(Some(obj)) => println!("{:?}", obj),
+                        Ok(None) => println!("Not found."),
+                        Err(e) => error!("Error: {:?}", e),
+                    }
                 }
                 NodeVerb::ListEdges(args) => {
                     info!("TODO - List edges of node {:?}, args {:?}", args.id, args);
@@ -444,7 +463,7 @@ pub fn go(cmd: &Command) {
                     trace!("Result: {:?}", result);
                     match result {
                         Ok(Some(edge)) => {
-                            let p = EdgePrinter;
+                            let mut p = EdgePrinter;
                             p.visit(edge);
                         }
                         Ok(None) => {

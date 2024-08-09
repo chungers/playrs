@@ -11,7 +11,6 @@ use rocksdb::{
     DBWithThreadMode, Direction, IteratorMode, SingleThreaded, WriteBatchWithTransaction, DB,
 };
 
-use std::convert::TryInto;
 use std::error::Error;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -101,13 +100,8 @@ pub trait Operations<E: Entity> {
     fn put(&mut self, e: &mut E) -> Result<Id<E>, Box<dyn Error>>;
     fn delete(&self, e: &E) -> Result<bool, Box<dyn Error>>;
     fn visit(&self, start_id: Id<E>, visitor: Box<dyn Visitor<E>>) -> Result<(), Box<dyn Error>>;
-    fn index_first(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>>;
-    fn index_scan(
-        &self,
-        index: &String,
-        match_start: &[u8],
-        visitor: Box<dyn Visitor<E>>,
-    ) -> Result<(), Box<dyn Error>>;
+    fn first(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>>;
+    fn match_bytes(&self, index: &String, match_start: &[u8]) -> Result<Vec<E>, Box<dyn Error>>;
 }
 
 pub(crate) trait IndexHelper<K: KeyCodec, E: Entity + HasKey<K>> {
@@ -201,7 +195,11 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
         todo!()
     }
 
-    fn visit(&self, start_id: Id<E>, visitor: Box<dyn Visitor<E>>) -> Result<(), Box<dyn Error>> {
+    fn visit(
+        &self,
+        start_id: Id<E>,
+        mut visitor: Box<dyn Visitor<E>>,
+    ) -> Result<(), Box<dyn Error>> {
         trace!("visit from {:?}", start_id);
         let cf = self
             .db
@@ -221,7 +219,7 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
         Ok(())
     }
 
-    fn index_first(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>> {
+    fn first(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>> {
         let cf = self.db.cf_handle(index.as_str()).unwrap();
         match self.db.get_cf(cf, match_bytes) {
             Ok(Some(bytes)) => {
@@ -233,44 +231,46 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
         }
     }
 
-    fn index_scan(
-        &self,
-        index: &String,
-        match_start: &[u8],
-        visitor: Box<dyn Visitor<E>>,
-    ) -> Result<(), Box<dyn Error>> {
-        let cf = self.db.cf_handle(index.as_str()).unwrap();
+    fn match_bytes(&self, index: &String, match_start: &[u8]) -> Result<Vec<E>, Box<dyn Error>> {
+        let cf = self.db.cf_handle(index).unwrap();
         trace!("Found cf {:?} with match={:?}", index, match_start);
         let iter = self
             .db
             .iterator_cf(cf, IteratorMode::From(match_start, Direction::Forward));
+        let mut matches = Vec::<E>::new();
         for item in iter {
             let (k, v) = item.unwrap();
-            // compare k with the match_start bytes.  If the bytes don't match <bytes>.* then stop
-            if k.len() >= match_start.len() && match_start.to_owned() != k[0..match_start.len()] {
+            if v.len() == 0 {
                 break;
             }
-            if v.len() > 0 {
-                trace!("For match={:?}, (k,v)={:?} | {:?}", match_start, k, v);
-                let id = E::id_from(KeyCodec::decode_key(v.to_vec()));
-                let stop: Result<bool, Box<dyn Error>> = match self.get(id)? {
-                    Some(obj) => Ok(!visitor.visit(obj)),
-                    None => {
-                        error!("Bad index!!! {:?}", ErrBadIndex::new(index.clone(), &v));
-                        Err(Box::new(ErrBadIndex::new(index.clone(), &v)))
-                    }
-                };
-                if stop? {
-                    break;
+            // The first bytes must match
+            if k.len() < match_start.len() {
+                break;
+            } else if match_start.to_owned() != k[0..match_start.len()] {
+                break;
+            }
+            trace!("For match={:?}, (k,v)={:?} | {:?}", match_start, k, v);
+            let id = E::id_from(KeyCodec::decode_key(v.to_vec()));
+            let stop: Result<bool, Box<dyn Error>> = match self.get(id)? {
+                Some(obj) => {
+                    matches.push(obj);
+                    Ok(false)
                 }
+                None => {
+                    error!("Bad index!!! {:?}", ErrBadIndex::new(index, &v));
+                    Err(Box::new(ErrBadIndex::new(index, &v)))
+                }
+            };
+            if stop? {
+                break;
             }
         }
-        Ok(())
+        Ok(matches)
     }
 }
 
 pub trait Visitor<E: Entity> {
-    fn visit(&self, entity: E) -> bool;
+    fn visit(&mut self, entity: E) -> bool;
 }
 
 pub trait VisitKV {
