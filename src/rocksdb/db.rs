@@ -101,7 +101,12 @@ pub trait Operations<E: Entity> {
     fn delete(&self, e: &E) -> Result<bool, Box<dyn Error>>;
     fn visit(&self, start_id: Id<E>, visitor: Box<dyn Visitor<E>>) -> Result<(), Box<dyn Error>>;
     fn first(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>>;
-    fn match_bytes(&self, index: &String, match_start: &[u8]) -> Result<Vec<E>, Box<dyn Error>>;
+    fn match_bytes(
+        &self,
+        index: &String,
+        match_start: &[u8],
+        n: u32,
+    ) -> Result<Vec<E>, Box<dyn Error>>;
 }
 
 pub(crate) trait IndexHelper<K: KeyCodec, E: Entity + HasKey<K>> {
@@ -231,9 +236,15 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
         }
     }
 
-    fn match_bytes(&self, index: &String, match_start: &[u8]) -> Result<Vec<E>, Box<dyn Error>> {
+    fn match_bytes(
+        &self,
+        index: &String,
+        match_start: &[u8],
+        n: u32,
+    ) -> Result<Vec<E>, Box<dyn Error>> {
         let cf = self.db.cf_handle(index).unwrap();
         trace!("Found cf {:?} with match={:?}", index, match_start);
+        let max: usize = usize::try_from(n)?;
         let iter = self
             .db
             .iterator_cf(cf, IteratorMode::From(match_start, Direction::Forward));
@@ -262,6 +273,9 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
                 }
             };
             if stop? {
+                break;
+            }
+            if matches.len() == max {
                 break;
             }
         }
