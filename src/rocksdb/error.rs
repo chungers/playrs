@@ -78,9 +78,9 @@ pub struct ErrBadIndex {
 }
 
 impl ErrBadIndex {
-    pub fn new(cf_name: String, key: &[u8]) -> ErrBadIndex {
+    pub fn new(cf_name: &String, key: &[u8]) -> ErrBadIndex {
         ErrBadIndex {
-            cf_name,
+            cf_name: cf_name.clone(),
             key: key.to_vec(),
         }
     }

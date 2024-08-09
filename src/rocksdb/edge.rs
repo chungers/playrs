@@ -37,7 +37,7 @@ impl db::OperationsBuilder<Edge> for Edge {
 
 pub struct EdgePrinter;
 impl db::Visitor<Edge> for EdgePrinter {
-    fn visit(&self, entity: Edge) -> bool {
+    fn visit(&mut self, entity: Edge) -> bool {
         println!("{:?}", entity);
         true
     }
@@ -129,7 +129,7 @@ impl Index<Edge> for ByName {
         "index.edge.name"
     }
     fn key_value(&self, e: &Edge) -> (Vec<u8>, Vec<u8>) {
-        (e.name.encode_to_vec(), e.id.to_le_bytes().to_vec())
+        (e.name.as_bytes().to_vec(), e.id.to_le_bytes().to_vec())
     }
 }
 

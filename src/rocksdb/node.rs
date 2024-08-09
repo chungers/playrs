@@ -36,12 +36,13 @@ impl db::OperationsBuilder<Node> for Node {
     }
 }
 
-pub struct NodePrinter;
+pub struct NodePrinter(pub u32);
 
 impl db::Visitor<Node> for NodePrinter {
-    fn visit(&self, entity: Node) -> bool {
+    fn visit(&mut self, entity: Node) -> bool {
         println!("{:?}", entity);
-        true
+        self.0 = self.0 - 1;
+        self.0 > 0
     }
 }
 struct IndexHelper {}
