@@ -4,7 +4,6 @@ use tracing::{debug, error, info, trace, warn};
 use crate::rocksdb::counter;
 use crate::rocksdb::error::{ErrBadDbPath, ErrBadIndex};
 use crate::rocksdb::index::Index;
-use crate::rocksdb::kv;
 use crate::rocksdb::All;
 
 use rocksdb::{
@@ -283,12 +282,8 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
     }
 }
 
-pub trait Visitor<E: Entity> {
+pub trait Visitor<E: Sized> {
     fn visit(&mut self, entity: E) -> bool;
-}
-
-pub trait VisitKV {
-    fn visit(&self, _: &[u8], _: &[u8]);
 }
 
 pub trait IndexBuilder {
@@ -486,39 +481,10 @@ pub fn indexes(
     }
 }
 
-pub fn delete(info: &dyn DbInfo, key: &str) -> Result<(), Box<dyn Error>> {
-    trace!("Delete path={}, key={}", info.path(), key);
-    let db = open_db(info, &All)?;
-    trace!("DB = {:?}", db);
-
-    let cf = db.cf_handle(kv::StringKV.cf_name()).unwrap();
-    match db.delete_cf(cf, key.as_bytes()) {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            error!("Error retrieving value for {}: {}", key, e);
-            return Err(Box::new(e));
-        }
-    }
-}
-
-pub fn list(info: &dyn DbInfo, key: &str, visitor: &dyn VisitKV) -> Result<(), Box<dyn Error>> {
-    trace!("List path={}, key={}", info.path(), key);
-    let db = open_db(info, &All)?;
-    trace!("DB = {:?}", db);
-
-    let cf = db.cf_handle(kv::StringKV.cf_name()).unwrap();
-    let iter = db.iterator_cf(cf, IteratorMode::From(key.as_bytes(), Direction::Forward));
-    for item in iter {
-        let (k, v) = item.unwrap();
-        visitor.visit(&k, &v);
-    }
-    Ok(())
-}
-
 pub fn list_index(
     info: &dyn DbInfo,
     index: &str,
-    visitor: &dyn VisitKV,
+    visitor: &mut dyn Visitor<(Box<[u8]>, Box<[u8]>)>,
 ) -> Result<(), Box<dyn Error>> {
     trace!("List path={}, key={}", info.path(), index);
     let db = open_db(info, &All)?;
@@ -527,8 +493,9 @@ pub fn list_index(
     let cf = db.cf_handle(index).unwrap();
     let iter = db.iterator_cf(cf, IteratorMode::From("".as_bytes(), Direction::Forward));
     for item in iter {
-        let (k, v) = item.unwrap();
-        visitor.visit(&k, &v);
+        if !visitor.visit(item.unwrap()) {
+            break;
+        }
     }
     Ok(())
 }
