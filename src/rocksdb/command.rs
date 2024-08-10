@@ -5,7 +5,6 @@ use crate::rocksdb::db::{self, HasKey, Visitor};
 use crate::rocksdb::edge::EdgePrinter;
 use crate::rocksdb::graph::{Edge, Node};
 use crate::rocksdb::index::Index;
-use crate::rocksdb::kv;
 use crate::rocksdb::node;
 use crate::rocksdb::node::NodePrinter;
 use crate::rocksdb::All;
@@ -70,7 +69,6 @@ pub enum Verb {
     Init(InitArgs),
     Counter(CounterArgs),
     Index(IndexCommand),
-    Kv(KvCommand),
     Node(NodeCommand),
     Edge(EdgeCommand),
 }
@@ -100,47 +98,6 @@ pub enum IndexVerb {
 pub struct IndexArgs {
     /// The key
     index: String,
-}
-
-#[derive(Debug, clapArgs)]
-pub struct KvCommand {
-    #[clap(subcommand)]
-    verb: KvVerb,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum KvVerb {
-    Put(KvPutArgs),
-    Get(KvGetArgs),
-    Delete(KvDeleteArgs),
-    List(KvListArgs),
-}
-
-#[derive(Debug, clapArgs)]
-pub struct KvPutArgs {
-    /// The key
-    key: String,
-
-    /// The value
-    value: String,
-}
-
-#[derive(Debug, clapArgs)]
-pub struct KvGetArgs {
-    /// The key
-    key: String,
-}
-
-#[derive(Debug, clapArgs)]
-pub struct KvDeleteArgs {
-    /// The key
-    key: String,
-}
-
-#[derive(Debug, clapArgs)]
-pub struct KvListArgs {
-    /// The key
-    prefix: String,
 }
 
 #[derive(Debug, clapArgs)]
@@ -262,27 +219,17 @@ pub struct EdgeListArgs {
     n: u32,
 }
 
-struct KvVisitor(i32);
-impl db::VisitKV for KvVisitor {
-    fn visit(&self, k: &[u8], v: &[u8]) {
-        println!(
-            "k={:?}, v={:?}",
-            String::from_utf8(k.to_vec()).unwrap(),
-            String::from_utf8(v.to_vec()).unwrap()
-        );
-    }
-}
-
-struct BytesVisitor;
-impl db::VisitKV for BytesVisitor {
-    fn visit(&self, k: &[u8], v: &[u8]) {
-        println!("[{:?}] | {:?}", k, v);
+struct BytesVisitor(u32);
+impl db::Visitor<(Box<[u8]>, Box<[u8]>)> for BytesVisitor {
+    fn visit(&mut self, kv: (Box<[u8]>, Box<[u8]>)) -> bool {
+        println!("[{:?}] | {:?}", kv.0, kv.1);
+        self.0 = self.0 - 1;
+        self.0 > 0
     }
 }
 
 pub fn go(cmd: &Command) {
     trace!("Running command: {:?}", cmd);
-    let visit = KvVisitor(0);
 
     match &cmd.verb {
         Verb::Init(args) => {
@@ -293,9 +240,21 @@ pub fn go(cmd: &Command) {
         Verb::Counter(args) => {
             trace!("Called count: {:?}", args);
             let database = db::open_db(&cmd.db, &All).unwrap();
-            let counters = db::default_counters(&database);
-            let counter = counters.get(args.key.as_str()).unwrap();
+            let mut counters = db::default_counters(&database);
+            let mut counter = counters.get(args.key.as_str()).unwrap();
             let result = counter.get();
+            counter.inc();
+            let mut txn = db::Transaction::default();
+            let commit = match counters.update(&mut txn, &counter) {
+                Ok(()) => true,
+                Err(_) => false,
+            };
+            if commit {
+                match database.write(txn) {
+                    Ok(()) => trace!("committed"),
+                    Err(e) => error!("Error: {:?}", e),
+                }
+            }
             trace!("Result: {:?}", result);
         }
         Verb::Index(indexcmd) => {
@@ -309,37 +268,8 @@ pub fn go(cmd: &Command) {
                 }
                 IndexVerb::Dump(args) => {
                     trace!("Dump index content: {:?}", args);
-                    let result = db::list_index(&cmd.db, &args.index, &BytesVisitor);
-                    trace!("Result: {:?}", result);
-                }
-            }
-        }
-
-        Verb::Kv(kvcmd) => {
-            trace!("Called kv: {:?}", kvcmd);
-            let database = db::open_db(&cmd.db, &All).unwrap();
-
-            match &kvcmd.verb {
-                KvVerb::Put(args) => {
-                    trace!("Called put: {:?}", args);
-                    let mut ops = kv::StringKV::operations(&database);
-                    let result = ops.put(&mut (args.key.to_string(), args.value.to_string()));
-                    trace!("Result: {:?}", result);
-                }
-                KvVerb::Get(args) => {
-                    trace!("Called get: {:?}", args);
-                    let ops = kv::StringKV::operations(&database);
-                    let result = ops.get(<(String, String)>::id_from(args.key.to_string()));
-                    trace!("Result: {:?}", result);
-                }
-                KvVerb::Delete(args) => {
-                    trace!("Called delete: {:?}", args);
-                    let result = db::delete(&cmd.db, &args.key);
-                    trace!("Result: {:?}", result);
-                }
-                KvVerb::List(args) => {
-                    trace!("Called list: {:?}", args);
-                    let result = db::list(&cmd.db, &args.prefix, &visit);
+                    let result =
+                        db::list_index(&cmd.db, &args.index, &mut BytesVisitor(u32::max_value()));
                     trace!("Result: {:?}", result);
                 }
             }

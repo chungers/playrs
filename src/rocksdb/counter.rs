@@ -2,7 +2,7 @@
 use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::db;
-use crate::rocksdb::db::{Entity, HasKey};
+use crate::rocksdb::db::{Entity, HasKey, KeyCodec};
 use crate::rocksdb::error::ErrNoCounters;
 
 use std::convert::TryInto;
@@ -22,11 +22,24 @@ impl Counter {
         }
     }
 
+    pub fn inc(&mut self) {
+        self.value = self.value + 1;
+    }
+
     pub fn set(&mut self, v: u64) {
         self.value = v;
     }
     pub fn get(&self) -> u64 {
         self.value
+    }
+}
+
+impl KeyCodec for String {
+    fn encode_key(&self) -> Vec<u8> {
+        self.as_bytes().to_vec()
+    }
+    fn decode_key(buff: Vec<u8>) -> String {
+        String::from_utf8(buff).unwrap()
     }
 }
 
@@ -59,7 +72,7 @@ pub(crate) struct Counters<'a> {
 impl Counters<'_> {
     pub fn new<'a>(db: &'a db::Database, cf: &'a str) -> Counters<'a> {
         Counters {
-            db: db,
+            db,
             column_family: cf.to_string(),
         }
     }

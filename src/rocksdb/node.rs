@@ -173,6 +173,3 @@ fn test_using_node_id() {
     println!("Got id = {:?}", node.id());
     println!("Id from raw = {:?}", Node::id_from(1u64));
 }
-
-#[test]
-fn test_using_node_operations() {}
