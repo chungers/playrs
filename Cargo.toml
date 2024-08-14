@@ -34,7 +34,6 @@ serde_json = { version = "1.0.81" }
 serde_yaml = { version = "0.9" }
 # ========== SERDE
 
-
 signal-hook = { version = "0.3.14" }
 tempfile = { version = "3" }
 
@@ -59,12 +58,12 @@ chrono = { version = "0.4.31", default-features = false }
 tower = "0.4.13"
 # ======================== GRPC
 
-
 # DuckDB =====================
 duckdb = { version = "1.0.0", features = ["bundled"] }
 # ===================== DuckDB
 
 # RocksDB =====================
+# https://docs.rs/rocksdb/0.21.0/rocksdb/
 rocksdb = { version = "0.22" }
 # ===================== RocksDB
 
