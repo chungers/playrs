@@ -17,7 +17,7 @@ use clap::{Args as clapArgs, Subcommand};
 use rocksdb::Options;
 use std::default::Default;
 
-#[derive(Debug, clapArgs, PartialEq, Eq)]
+#[derive(Debug, Clone, clapArgs, PartialEq, Eq)]
 pub struct DbArgs {
     /// The DB path
     path: String,
