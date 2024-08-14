@@ -62,8 +62,8 @@ tower = "0.4.13"
 duckdb = { version = "1.0.0", features = ["bundled"] }
 # ===================== DuckDB
 
+
 # RocksDB =====================
-# https://docs.rs/rocksdb/0.21.0/rocksdb/
 rocksdb = { version = "0.22" }
 # ===================== RocksDB
 
