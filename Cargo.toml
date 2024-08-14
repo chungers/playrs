@@ -11,12 +11,12 @@ edition = "2021"
 futures = { version = "0.3.21" }
 async-std = { version = "1.12" }
 crossbeam-channel = { version = "0.5.5" }
-notify = { version = "5.1.0" }
+notify = { version = "6.1.1" }
 # ====== Filesystem notifications
 
 # Apache Arrow ===
 # Used by Duckdb example also
-arrow = { version = "33.0.0" }
+arrow = { version = "52.2.0" }
 # === Apache Arrow
 
 # CLI ============
@@ -28,7 +28,7 @@ serde = { version = "1.0.137", features = ["derive"] }
 # JSON
 serde_json = { version = "1.0.81" }
 # YAML
-serde_yaml = { version = "0.8.24" }
+serde_yaml = { version = "0.9" }
 # ========== SERDE
 
 
@@ -43,34 +43,29 @@ tracing-subscriber = { version = "0.3" }
 # ========== Logging / Tracing
 
 # Error handling
-simple-error = { version = "0.2.3" }
+simple-error = { version = "0.3.1" }
 
 # GRPC ========================
 # https://www.swiftdiaries.com/rust/tonic/
-<<<<<<< HEAD
-tonic = { version = "0.10.2", features = ["tls"] }
-=======
-tonic = { version = "0.10.2", features = [ "tls" ] }
->>>>>>> 2cdce09 (Merge upstream)
-tonic-reflection = "0.10.2"
+tonic = { version = "0.12.1", features = ["tls"] }
+tonic-reflection = "0.12.1"
 tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread"] }
-prost = { version = "0.12.1" }
-prost-types = { version = "0.12.1" }
+prost = { version = "0.13.1" }
+prost-types = { version = "0.13.1" }
 chrono = { version = "0.4.31", default-features = false }
 tower = "0.4.13"
 # ======================== GRPC
 
 
 # DuckDB =====================
-duckdb = { version = "0.6", features = ["bundled"] }
+duckdb = { version = "1.0.0", features = ["bundled"] }
 # ===================== DuckDB
 
 # RocksDB =====================
-# https://docs.rs/rocksdb/0.21.0/rocksdb/
-rocksdb = { version = "0.21" }
+rocksdb = { version = "0.22" }
 # ===================== RocksDB
 
 [build-dependencies]
 
 # GRPC
-tonic-build = { version = "0.9" }
+tonic-build = { version = "0.12.1" }
