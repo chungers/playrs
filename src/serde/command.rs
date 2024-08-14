@@ -1,4 +1,4 @@
-use clap::{ArgEnum, Args as clapArgs, Subcommand};
+use clap::{Args as clapArgs, Subcommand, ValueEnum};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
@@ -16,7 +16,7 @@ pub enum Verb {
     Decode(DecodeArgs),
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 enum Encoding {
     Yaml,
     Json,
@@ -25,7 +25,7 @@ enum Encoding {
 #[derive(Debug, clapArgs)]
 pub struct EncodeArgs {
     /// Encoding to use
-    #[clap(long, arg_enum)]
+    #[clap(long)]
     encoding: Encoding,
 
     /// x coordinate for Point
@@ -38,7 +38,7 @@ pub struct EncodeArgs {
 #[derive(Debug, clapArgs)]
 pub struct DecodeArgs {
     /// Encoding to use
-    #[clap(long, arg_enum)]
+    #[clap(long)]
     encoding: Encoding,
 
     #[clap(long = "stdin", short = 's')]
