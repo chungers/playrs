@@ -1,7 +1,9 @@
+use duckdb::arrow::datatypes::ToByteSlice;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::db::{self, HasKey, Visitor};
+use crate::rocksdb::edge;
 use crate::rocksdb::edge::EdgePrinter;
 use crate::rocksdb::graph::{Edge, Node};
 use crate::rocksdb::index::Index;
@@ -111,7 +113,6 @@ pub enum NodeVerb {
     Put(NodePutArgs),
     Get(NodeGetArgs),
     List(NodeListArgs),
-    ListEdges(NodeListEdgesArgs),
     ByName(NodeByNameArgs),
     First(NodeFirstArgs),
 }
@@ -165,26 +166,28 @@ pub struct NodeListArgs {
 }
 
 #[derive(Debug, clapArgs)]
-pub struct NodeListEdgesArgs {
-    /// The direction of the edge
-    #[clap(long = "to")]
-    to: bool,
-
-    /// The id of the node
-    id: u64,
-}
-
-#[derive(Debug, clapArgs)]
 pub struct EdgeCommand {
     #[clap(subcommand)]
     verb: EdgeVerb,
 }
 
+#[derive(Debug, clapArgs)]
+pub struct NodeNameArgs {
+    name: String,
+
+    /// Raw prints the protobuf of the edges
+    #[clap(short = 'r')]
+    raw: bool,
+}
+
 #[derive(Debug, Subcommand)]
 pub enum EdgeVerb {
     Put(EdgePutArgs),
+    Rel(EdgeRelArgs),
     Get(EdgeGetArgs),
     List(EdgeListArgs),
+    From(NodeNameArgs),
+    To(NodeNameArgs),
 }
 
 #[derive(Debug, clapArgs)]
@@ -206,6 +209,22 @@ pub struct EdgePutArgs {
 }
 
 #[derive(Debug, clapArgs)]
+pub struct EdgeRelArgs {
+    /// The head name
+    head: String,
+
+    /// The name of the relation
+    relation: String,
+
+    /// The tail name
+    tail: String,
+
+    /// The type name of the edge
+    #[clap(long = "type")]
+    type_name: Option<String>,
+}
+
+#[derive(Debug, clapArgs)]
 pub struct EdgeGetArgs {
     /// The id of the node
     id: u64,
@@ -217,6 +236,22 @@ pub struct EdgeListArgs {
     start_id: u64,
     /// How many to list
     n: u32,
+}
+
+#[derive(Debug, clapArgs)]
+pub struct EdgeFromArgs {
+    /// The head name
+    head: String,
+
+    /// The name of the relation
+    relation: String,
+
+    /// The tail name
+    tail: String,
+
+    /// The type name of the edge
+    #[clap(long = "type")]
+    type_name: Option<String>,
 }
 
 struct BytesVisitor(u32);
@@ -358,15 +393,47 @@ pub fn go(cmd: &Command) {
                         Err(e) => error!("Error: {:?}", e),
                     }
                 }
-                NodeVerb::ListEdges(args) => {
-                    info!("TODO - List edges of node {:?}, args {:?}", args.id, args);
-                }
             }
         }
         Verb::Edge(ncmd) => {
             trace!("Called edge: {:?}", cmd);
             let database = db::open_db(&cmd.db, &All).unwrap();
             match &ncmd.verb {
+                EdgeVerb::Rel(args) => {
+                    // Look up the head and tail by name
+                    let node_ops = Node::operations(&database);
+                    match node_ops.first(&node::ByName.cf_name().to_string(), args.head.as_bytes())
+                    {
+                        Ok(Some(head)) => {
+                            match node_ops
+                                .first(&node::ByName.cf_name().to_string(), args.tail.as_bytes())
+                            {
+                                Ok(Some(tail)) => {
+                                    trace!("{:?} --{:?}-> {:?}", head, args.relation, tail);
+                                    let mut edge = Edge {
+                                        id: 0,
+                                        head: head.id,
+                                        tail: tail.id,
+                                        type_name: match &args.type_name {
+                                            Some(v) => v.to_string(),
+                                            None => "relation".to_string(),
+                                        },
+                                        type_code: 0,
+                                        name: args.relation.clone(),
+                                        cas: String::from(""),
+                                    };
+                                    let mut ops = Edge::operations(&database);
+                                    let result = ops.put(&mut edge);
+                                    info!("Result: {:?}", result);
+                                }
+                                Ok(None) => error!("Node name not found: {:?}", args.tail),
+                                Err(e) => error!("Error:{:?}", e),
+                            }
+                        }
+                        Ok(None) => error!("Node name not found: {:?}", args.head),
+                        Err(e) => error!("Error:{:?}", e),
+                    }
+                }
                 EdgeVerb::Put(args) => {
                     let id: u64 = match args.id {
                         Some(v) => v,
@@ -396,7 +463,7 @@ pub fn go(cmd: &Command) {
                     trace!("Result: {:?}", result);
                     match result {
                         Ok(Some(edge)) => {
-                            let mut p = EdgePrinter;
+                            let mut p = EdgePrinter(1);
                             p.visit(edge);
                         }
                         Ok(None) => {
@@ -410,13 +477,85 @@ pub fn go(cmd: &Command) {
                 EdgeVerb::List(args) => {
                     trace!("List edges: {:?}", args);
                     let ops = Edge::operations(&database);
-                    match ops.visit(Edge::id_from(args.start_id), Box::new(EdgePrinter)) {
+                    match ops.visit(Edge::id_from(args.start_id), Box::new(EdgePrinter(args.n))) {
                         Ok(()) => {
                             info!("Done");
                         }
                         Err(e) => {
                             error!("Error: {:?}", e);
                         }
+                    }
+                }
+                EdgeVerb::From(args) => {
+                    trace!("Edges from {:?}", args);
+                    // Look up the head and tail by name
+                    let node_ops = Node::operations(&database);
+                    match node_ops.first(&node::ByName.cf_name().to_string(), args.name.as_bytes())
+                    {
+                        Ok(Some(head)) => {
+                            let edge_ops = Edge::operations(&database);
+                            match edge_ops.match_bytes(
+                                &edge::ByHeadTail.cf_name().to_string(),
+                                head.id.to_le_bytes().to_byte_slice(),
+                                u32::max_value(),
+                            ) {
+                                Ok(found) => {
+                                    for f in found {
+                                        if !args.raw {
+                                            match node_ops.get(Node::id_from(f.tail)) {
+                                                Ok(Some(tail)) => println!(
+                                                    "{:?} {:?} {:?}",
+                                                    head.name, f.name, tail.name
+                                                ),
+                                                Ok(None) => error!("To not found: {:?}", f.tail),
+                                                Err(e) => error!("Error {:?}", e),
+                                            }
+                                        } else {
+                                            println!("{:?}", f);
+                                        }
+                                    }
+                                }
+                                Err(e) => error!("Error: {:?}", e),
+                            }
+                        }
+                        Ok(None) => error!("Node from {:?} not found.", args.name),
+                        Err(e) => error!("Error: {:?}", e),
+                    }
+                }
+                EdgeVerb::To(args) => {
+                    trace!("Edges to {:?}", args);
+                    // Look up the head and tail by name
+                    let node_ops = Node::operations(&database);
+                    match node_ops.first(&node::ByName.cf_name().to_string(), args.name.as_bytes())
+                    {
+                        Ok(Some(tail)) => {
+                            let edge_ops = Edge::operations(&database);
+                            match edge_ops.match_bytes(
+                                &edge::ByTailHead.cf_name().to_string(),
+                                tail.id.to_le_bytes().to_byte_slice(),
+                                u32::max_value(),
+                            ) {
+                                Ok(found) => {
+                                    for f in found {
+                                        if !args.raw {
+                                            match node_ops.get(Node::id_from(f.head)) {
+                                                Ok(Some(head)) => println!(
+                                                    "{:?} {:?} {:?}",
+                                                    head.name, f.name, tail.name
+                                                ),
+                                                Ok(None) => error!("From not found: {:?}", f.head),
+                                                Err(e) => error!("Error {:?}", e),
+                                            }
+                                        } else {
+                                            println!("{:?}", f);
+                                        }
+                                    }
+                                }
+                                Err(e) => error!("Error: {:?}", e),
+                            }
+                        }
+                        Ok(None) => error!("Node from {:?} not found.", args.name),
+                        Err(e) => error!("Error: {:?}", e),
                     }
                 }
             }

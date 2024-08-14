@@ -35,11 +35,13 @@ impl db::OperationsBuilder<Edge> for Edge {
     }
 }
 
-pub struct EdgePrinter;
+// TODO - Refactor to use generics
+pub struct EdgePrinter(pub u32);
 impl db::Visitor<Edge> for EdgePrinter {
     fn visit(&mut self, entity: Edge) -> bool {
         println!("{:?}", entity);
-        true
+        self.0 = self.0 - 1;
+        self.0 > 0
     }
 }
 struct IndexHelper {}
