@@ -1,10 +1,8 @@
-use duckdb::arrow::datatypes::ToByteSlice;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::db::{self, HasKey, Visitor};
-use crate::rocksdb::edge;
-use crate::rocksdb::edge::EdgePrinter;
+use crate::rocksdb::edge::{self, EdgeCollector, EdgePrinter};
 use crate::rocksdb::graph::{Edge, Node};
 use crate::rocksdb::index::Index;
 use crate::rocksdb::node;
@@ -144,7 +142,7 @@ pub struct NodeByNameArgs {
     /// Match bytes
     match_string: String,
     /// How many to return.  1 == exact match.
-    n: u32,
+    n: usize,
 }
 
 #[derive(Debug, clapArgs)]
@@ -162,7 +160,7 @@ pub struct NodeListArgs {
     start_id: u64,
 
     /// How many to list
-    n: u32,
+    n: usize,
 }
 
 #[derive(Debug, clapArgs)]
@@ -358,12 +356,8 @@ pub fn go(cmd: &Command) {
                     info!("List {:?} nodes from id={:?}", args.n, args.start_id,);
                     let ops = Node::operations(&database);
                     match ops.visit(Node::id_from(args.start_id), Box::new(NodePrinter(args.n))) {
-                        Ok(()) => {
-                            info!("Done");
-                        }
-                        Err(e) => {
-                            error!("Error: {:?}", e);
-                        }
+                        Ok(()) => trace!("Done"),
+                        Err(e) => error!("Error: {:?}", e),
                     }
                 }
                 NodeVerb::ByName(args) => {
@@ -371,23 +365,17 @@ pub fn go(cmd: &Command) {
                     let ops = Node::operations(&database);
                     match ops.match_bytes(
                         &node::ByName.cf_name().to_string(),
-                        args.match_string.as_bytes(),
-                        args.n,
+                        args.match_string.as_bytes().to_vec(),
+                        Box::new(NodePrinter(args.n)),
                     ) {
-                        Ok(matches) => {
-                            let c = matches.len();
-                            for n in matches {
-                                println!("{:?}", n);
-                            }
-                            info!("Done ({:?})", c);
-                        }
+                        Ok(()) => trace!("Done."),
                         Err(e) => error!("Error: {:?}", e),
-                    };
+                    }
                 }
                 NodeVerb::First(args) => {
                     trace!("First in index: {:?}", args);
                     let ops = Node::operations(&database);
-                    match ops.first(&args.index, args.match_string.as_bytes()) {
+                    match ops.exact(&args.index, args.match_string.as_bytes()) {
                         Ok(Some(obj)) => println!("{:?}", obj),
                         Ok(None) => println!("Not found."),
                         Err(e) => error!("Error: {:?}", e),
@@ -402,11 +390,11 @@ pub fn go(cmd: &Command) {
                 EdgeVerb::Rel(args) => {
                     // Look up the head and tail by name
                     let node_ops = Node::operations(&database);
-                    match node_ops.first(&node::ByName.cf_name().to_string(), args.head.as_bytes())
+                    match node_ops.exact(&node::ByName.cf_name().to_string(), args.head.as_bytes())
                     {
                         Ok(Some(head)) => {
                             match node_ops
-                                .first(&node::ByName.cf_name().to_string(), args.tail.as_bytes())
+                                .exact(&node::ByName.cf_name().to_string(), args.tail.as_bytes())
                             {
                                 Ok(Some(tail)) => {
                                     trace!("{:?} --{:?}-> {:?}", head, args.relation, tail);
@@ -488,19 +476,21 @@ pub fn go(cmd: &Command) {
                 }
                 EdgeVerb::From(args) => {
                     trace!("Edges from {:?}", args);
+                    let mut buffer: Vec<Edge> = vec![];
+                    let visitor = EdgeCollector::new(&mut buffer, usize::max_value());
                     // Look up the head and tail by name
                     let node_ops = Node::operations(&database);
-                    match node_ops.first(&node::ByName.cf_name().to_string(), args.name.as_bytes())
+                    match node_ops.exact(&node::ByName.cf_name().to_string(), args.name.as_bytes())
                     {
                         Ok(Some(head)) => {
                             let edge_ops = Edge::operations(&database);
                             match edge_ops.match_bytes(
                                 &edge::ByHeadTail.cf_name().to_string(),
-                                head.id.to_le_bytes().to_byte_slice(),
-                                u32::max_value(),
+                                head.id.to_le_bytes().to_vec(),
+                                Box::new(visitor),
                             ) {
-                                Ok(found) => {
-                                    for f in found {
+                                Ok(()) => {
+                                    for f in buffer.iter() {
                                         if !args.raw {
                                             match node_ops.get(Node::id_from(f.tail)) {
                                                 Ok(Some(tail)) => println!(
@@ -524,19 +514,22 @@ pub fn go(cmd: &Command) {
                 }
                 EdgeVerb::To(args) => {
                     trace!("Edges to {:?}", args);
+                    let mut buffer: Vec<Edge> = vec![];
+                    let visitor = EdgeCollector::new(&mut buffer, usize::max_value());
+
                     // Look up the head and tail by name
                     let node_ops = Node::operations(&database);
-                    match node_ops.first(&node::ByName.cf_name().to_string(), args.name.as_bytes())
+                    match node_ops.exact(&node::ByName.cf_name().to_string(), args.name.as_bytes())
                     {
                         Ok(Some(tail)) => {
                             let edge_ops = Edge::operations(&database);
                             match edge_ops.match_bytes(
                                 &edge::ByTailHead.cf_name().to_string(),
-                                tail.id.to_le_bytes().to_byte_slice(),
-                                u32::max_value(),
+                                tail.id.to_le_bytes().to_vec(),
+                                Box::new(visitor),
                             ) {
-                                Ok(found) => {
-                                    for f in found {
+                                Ok(()) => {
+                                    for f in buffer.iter() {
                                         if !args.raw {
                                             match node_ops.get(Node::id_from(f.head)) {
                                                 Ok(Some(head)) => println!(

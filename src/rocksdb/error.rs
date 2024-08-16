@@ -93,3 +93,21 @@ impl fmt::Display for ErrBadIndex {
 }
 
 impl Error for ErrBadIndex {}
+
+#[derive(Debug, Clone)]
+pub struct ErrNoSuchNode {
+    name: String,
+}
+
+impl ErrNoSuchNode {
+    pub fn new(name: String) -> ErrNoSuchNode {
+        ErrNoSuchNode { name }
+    }
+}
+impl Error for ErrNoSuchNode {}
+
+impl std::fmt::Display for ErrNoSuchNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "No such node: {:?}", self.name)
+    }
+}

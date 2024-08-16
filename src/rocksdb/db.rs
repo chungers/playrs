@@ -1,3 +1,4 @@
+use arrow::datatypes::ToByteSlice;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
@@ -98,14 +99,18 @@ pub trait Operations<E: Entity> {
     fn get(&self, id: Id<E>) -> Result<Option<E>, Box<dyn Error>>;
     fn put(&mut self, e: &mut E) -> Result<Id<E>, Box<dyn Error>>;
     fn delete(&self, e: &E) -> Result<bool, Box<dyn Error>>;
-    fn visit(&self, start_id: Id<E>, visitor: Box<dyn Visitor<E>>) -> Result<(), Box<dyn Error>>;
-    fn first(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>>;
+    fn visit(
+        &self,
+        start_id: Id<E>,
+        visitor: Box<dyn Visitor<E> + '_>,
+    ) -> Result<(), Box<dyn Error>>;
+    fn exact(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>>;
     fn match_bytes(
         &self,
         index: &String,
-        match_start: &[u8],
-        n: u32,
-    ) -> Result<Vec<E>, Box<dyn Error>>;
+        match_start: Vec<u8>, //&[u8],
+        visitor: Box<dyn Visitor<E> + '_>,
+    ) -> Result<(), Box<dyn Error>>;
 }
 
 pub(crate) trait IndexHelper<K: KeyCodec, E: Entity + HasKey<K>> {
@@ -195,6 +200,7 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
 
         Ok(o.id())
     }
+
     fn delete(&self, _o: &E) -> Result<bool, Box<dyn Error>> {
         todo!()
     }
@@ -202,7 +208,7 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
     fn visit(
         &self,
         start_id: Id<E>,
-        mut visitor: Box<dyn Visitor<E>>,
+        mut visitor: Box<dyn Visitor<E> + '_>,
     ) -> Result<(), Box<dyn Error>> {
         trace!("visit from {:?}", start_id);
         let cf = self
@@ -223,7 +229,7 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
         Ok(())
     }
 
-    fn first(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>> {
+    fn exact(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>> {
         let cf = self.db.cf_handle(index.as_str()).unwrap();
         match self.db.get_cf(cf, match_bytes) {
             Ok(Some(bytes)) => {
@@ -238,16 +244,15 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
     fn match_bytes(
         &self,
         index: &String,
-        match_start: &[u8],
-        n: u32,
-    ) -> Result<Vec<E>, Box<dyn Error>> {
+        match_start: Vec<u8>, //&[u8],
+        mut visitor: Box<dyn Visitor<E> + '_>,
+    ) -> Result<(), Box<dyn Error>> {
         let cf = self.db.cf_handle(index).unwrap();
         trace!("Found cf {:?} with match={:?}", index, match_start);
-        let max: usize = usize::try_from(n)?;
-        let iter = self
-            .db
-            .iterator_cf(cf, IteratorMode::From(match_start, Direction::Forward));
-        let mut matches = Vec::<E>::new();
+        let iter = self.db.iterator_cf(
+            cf,
+            IteratorMode::From(match_start.to_byte_slice(), Direction::Forward),
+        );
         for item in iter {
             let (k, v) = item.unwrap();
             if v.len() == 0 {
@@ -262,10 +267,7 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
             trace!("For match={:?}, (k,v)={:?} | {:?}", match_start, k, v);
             let id = E::id_from(KeyCodec::decode_key(v.to_vec()));
             let stop: Result<bool, Box<dyn Error>> = match self.get(id)? {
-                Some(obj) => {
-                    matches.push(obj);
-                    Ok(false)
-                }
+                Some(obj) => Ok(!visitor.visit(obj)),
                 None => {
                     error!("Bad index!!! {:?}", ErrBadIndex::new(index, &v));
                     Err(Box::new(ErrBadIndex::new(index, &v)))
@@ -274,11 +276,8 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
             if stop? {
                 break;
             }
-            if matches.len() == max {
-                break;
-            }
         }
-        Ok(matches)
+        Ok(())
     }
 }
 

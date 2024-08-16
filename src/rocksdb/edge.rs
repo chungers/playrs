@@ -3,7 +3,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use prost::Message; // need the trait to encode protobuf
 
-use crate::rocksdb::db;
+use crate::rocksdb::db::{self, Visitor};
 use crate::rocksdb::graph::Edge;
 use crate::rocksdb::index::{Index, Indexes};
 
@@ -44,6 +44,68 @@ impl db::Visitor<Edge> for EdgePrinter {
         self.0 > 0
     }
 }
+
+#[derive(Debug, PartialEq)]
+pub struct EdgeCollector<'a> {
+    list: &'a mut Vec<Edge>,
+    max: usize,
+}
+
+impl<'a> EdgeCollector<'a> {
+    pub fn new(list: &'a mut Vec<Edge>, max: usize) -> Self {
+        Self { list, max }
+    }
+    pub fn len(&self) -> usize {
+        self.list.len()
+    }
+}
+
+impl<'a> db::Visitor<Edge> for EdgeCollector<'a> {
+    fn visit(&mut self, entity: Edge) -> bool {
+        if self.max == self.list.len() {
+            return false;
+        }
+        self.list.push(entity);
+        self.max = self.max - 1;
+        self.max > 0
+    }
+}
+
+impl db::Visitor<Edge> for Vec<Edge> {
+    fn visit(&mut self, entity: Edge) -> bool {
+        self.push(entity);
+        true
+    }
+}
+
+#[test]
+fn test_using_edge_collector() {
+    fn static_dispatch<V: db::Visitor<Edge>>(v: &mut V) {
+        assert!(v.visit(Edge::default()))
+    }
+    fn dyn_dispatch(mut ptr: Box<dyn db::Visitor<Edge> + '_>) {
+        assert!(ptr.visit(Edge::default()));
+    }
+
+    let mut buff: Vec<Edge> = vec![];
+    static_dispatch(&mut buff);
+    assert_eq!(1, buff.len());
+    static_dispatch(&mut buff);
+    assert_eq!(2, buff.len());
+
+    let collector2 = EdgeCollector::new(&mut buff, 100);
+    dyn_dispatch(Box::new(collector2));
+    assert_eq!(3, buff.len());
+
+    let collector3 = EdgeCollector::new(&mut buff, 100);
+    assert_eq!(3, collector3.len());
+    dyn_dispatch(Box::new(collector3));
+    assert_eq!(4, buff.len());
+
+    let mut collector4 = EdgeCollector::new(&mut buff, 4);
+    assert!(!collector4.visit(Edge::default()));
+}
+
 struct IndexHelper {}
 
 impl db::IndexHelper<u64, Edge> for IndexHelper {

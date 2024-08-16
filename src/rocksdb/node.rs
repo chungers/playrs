@@ -36,7 +36,7 @@ impl db::OperationsBuilder<Node> for Node {
     }
 }
 
-pub struct NodePrinter(pub u32);
+pub struct NodePrinter(pub usize);
 
 impl db::Visitor<Node> for NodePrinter {
     fn visit(&mut self, entity: Node) -> bool {
