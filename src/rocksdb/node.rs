@@ -9,6 +9,7 @@ use crate::rocksdb::index::{Index, Indexes};
 
 use std::error::Error;
 use std::io::Cursor;
+use time::OffsetDateTime;
 
 impl db::HasKey<u64> for Node {
     fn key(&self) -> Option<u64> {
@@ -57,6 +58,14 @@ impl db::IndexHelper<u64, Node> for IndexHelper {
     fn before_put(&self, db: &db::Database, node: &mut Node) -> Result<(), Box<dyn Error>> {
         if node.id == 0 {
             node.id = db::next_id(db)?;
+        }
+        // TODO - This should be set by the db if Entity has a trait for setting
+        // the timestamp.  In general, Entity should have Id and Timestamp
+        if node.ts_nano.len() == 0 {
+            node.ts_nano = OffsetDateTime::now_utc()
+                .unix_timestamp_nanos()
+                .to_le_bytes()
+                .to_vec();
         }
         node.type_code = db::type_code(db, &node.type_name)?;
         Ok(())
@@ -151,10 +160,10 @@ fn test_using_node_indexes() {
         "kv = {:?}",
         ByType.key_value(&Node {
             id: 1u64,
-            type_name: "foo".into(),
+            type_name: "".into(),
             type_code: 2u64,
-            name: "foo".into(),
-            cas: "".into(),
+            name: "".into(),
+            ts_nano: vec![],
         })
     );
 }
@@ -163,10 +172,10 @@ fn test_using_node_indexes() {
 fn test_using_node_id() {
     let node = Node {
         id: 1u64,
-        type_name: "foo".into(),
+        type_name: "".into(),
         type_code: 2u64,
-        name: "foo".into(),
-        cas: "".into(),
+        name: "".into(),
+        ts_nano: vec![],
     };
 
     use db::HasKey;

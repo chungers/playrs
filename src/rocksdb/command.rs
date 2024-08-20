@@ -121,11 +121,9 @@ pub struct NodePutArgs {
     name: String,
 
     /// The type name of the node
-    #[clap(long = "type")]
+    #[clap(long = "is")]
     type_name: Option<String>,
 
-    /// The description of the node
-    description: Option<String>,
     /// The id of the node
     #[clap(long = "id")]
     id: Option<u64>,
@@ -181,7 +179,7 @@ pub struct NodeNameArgs {
 #[derive(Debug, Subcommand)]
 pub enum EdgeVerb {
     Put(EdgePutArgs),
-    Rel(EdgeRelArgs),
+    Associate(EdgeRelArgs),
     Get(EdgeGetArgs),
     List(EdgeListArgs),
     From(NodeNameArgs),
@@ -198,7 +196,7 @@ pub struct EdgePutArgs {
     name: String,
 
     /// The type name of the edge
-    #[clap(long = "type")]
+    #[clap(long = "is")]
     type_name: Option<String>,
 
     /// The id of the node
@@ -212,7 +210,7 @@ pub struct EdgeRelArgs {
     head: String,
 
     /// The name of the relation
-    relation: String,
+    name: String,
 
     /// The tail name
     tail: String,
@@ -326,7 +324,7 @@ pub fn go(cmd: &Command) {
                         },
                         type_code: 0,
                         name: args.name.clone(),
-                        cas: "".into(),
+                        ts_nano: vec![],
                     };
 
                     let mut ops = Node::operations(&database);
@@ -387,7 +385,7 @@ pub fn go(cmd: &Command) {
             trace!("Called edge: {:?}", cmd);
             let database = db::open_db(&cmd.db, &All).unwrap();
             match &ncmd.verb {
-                EdgeVerb::Rel(args) => {
+                EdgeVerb::Associate(args) => {
                     // Look up the head and tail by name
                     let node_ops = Node::operations(&database);
                     match node_ops.exact(&node::ByName.cf_name().to_string(), args.head.as_bytes())
@@ -397,18 +395,18 @@ pub fn go(cmd: &Command) {
                                 .exact(&node::ByName.cf_name().to_string(), args.tail.as_bytes())
                             {
                                 Ok(Some(tail)) => {
-                                    trace!("{:?} --{:?}-> {:?}", head, args.relation, tail);
+                                    trace!("{:?} --{:?}-> {:?}", head, args.name, tail);
                                     let mut edge = Edge {
                                         id: 0,
                                         head: head.id,
                                         tail: tail.id,
                                         type_name: match &args.type_name {
                                             Some(v) => v.to_string(),
-                                            None => "relation".to_string(),
+                                            None => args.name.clone(),
                                         },
                                         type_code: 0,
-                                        name: args.relation.clone(),
-                                        cas: String::from(""),
+                                        name: args.name.clone(),
+                                        ts_nano: vec![],
                                     };
                                     let mut ops = Edge::operations(&database);
                                     let result = ops.put(&mut edge);
@@ -433,11 +431,11 @@ pub fn go(cmd: &Command) {
                         tail: args.tail,
                         type_name: match &args.type_name {
                             Some(v) => v.to_string(),
-                            None => "relation".to_string(),
+                            None => args.name.clone(),
                         },
                         type_code: 0,
                         name: args.name.clone(),
-                        cas: String::from(""),
+                        ts_nano: vec![],
                     };
                     let mut ops = Edge::operations(&database);
                     let result = ops.put(&mut edge);

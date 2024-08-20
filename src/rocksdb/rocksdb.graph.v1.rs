@@ -4,22 +4,31 @@
 pub struct Node {
     #[prost(uint64, tag = "1")]
     pub id: u64,
+    /// This is the Symbol id
     #[prost(uint64, tag = "2")]
     pub type_code: u64,
+    /// TODO deprecate - remove this
     #[prost(string, tag = "3")]
     pub type_name: ::prost::alloc::string::String,
+    /// Label of the instance
     #[prost(string, tag = "4")]
     pub name: ::prost::alloc::string::String,
-    #[prost(string, tag = "5")]
-    pub cas: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", tag = "5")]
+    pub ts_nano: ::prost::alloc::vec::Vec<u8>,
 }
+/// Indexes on edge:
+/// {id} => value
+/// {head, tail, type_code} => edge_id /* latest edge */
+/// {head, tail, type_code, ts_nano} => edge_id  /* historical */
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Edge {
     #[prost(uint64, tag = "1")]
     pub id: u64,
+    /// This is the Symbol id.
     #[prost(uint64, tag = "2")]
     pub type_code: u64,
+    /// TODO deprecate - remove this.
     #[prost(string, tag = "3")]
     pub type_name: ::prost::alloc::string::String,
     #[prost(string, tag = "4")]
@@ -28,6 +37,48 @@ pub struct Edge {
     pub head: u64,
     #[prost(uint64, tag = "6")]
     pub tail: u64,
-    #[prost(string, tag = "7")]
-    pub cas: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", tag = "7")]
+    pub ts_nano: ::prost::alloc::vec::Vec<u8>,
+}
+/// The key of an attribute is {parent_id, name}, attribute_proto => current
+/// Historical = {parent_id, name, ts_nano}, attribute_proto
+/// A put of an attribute will first check the historical index with the
+/// content hash of the new attribute.  The current value index is updated
+/// only when the last(history(content_hash) != new_value.content_hash
+/// Indexes
+/// For node attrbutes -
+/// {node_id, name} =>
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Attribute {
+    /// Id of the Edge or Node it's attached to.'
+    #[prost(uint64, tag = "1")]
+    pub parent_id: u64,
+    #[prost(string, tag = "2")]
+    pub name: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", tag = "3")]
+    pub content: ::prost::alloc::vec::Vec<u8>,
+    #[prost(string, tag = "4")]
+    pub content_type: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", tag = "5")]
+    pub content_hash: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes = "vec", tag = "6")]
+    pub ts_nano: ::prost::alloc::vec::Vec<u8>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Symbol {
+    #[prost(uint64, tag = "1")]
+    pub id: u64,
+    /// e.g. "depends-on""
+    #[prost(string, tag = "2")]
+    pub name: ::prost::alloc::string::String,
+    /// e.g. sha256("depends-on")
+    #[prost(bytes = "vec", tag = "3")]
+    pub name_hash: ::prost::alloc::vec::Vec<u8>,
+    /// e.g. "Specifies a dependency of one entity to another."
+    #[prost(string, tag = "4")]
+    pub doc: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", tag = "5")]
+    pub ts_nano: ::prost::alloc::vec::Vec<u8>,
 }
