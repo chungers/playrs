@@ -3,12 +3,15 @@ use tracing::{debug, error, info, trace, warn};
 
 use prost::Message; // need the trait to encode protobuf
 
+#[allow(unused_imports)]
 use crate::rocksdb::db::{self, Visitor};
 use crate::rocksdb::graph::Edge;
 use crate::rocksdb::index::{Index, Indexes};
 
 use std::error::Error;
 use std::io::Cursor;
+use time::OffsetDateTime;
+
 impl db::HasKey<u64> for Edge {
     fn key(&self) -> Option<u64> {
         if self.id > 0 {
@@ -119,6 +122,15 @@ impl db::IndexHelper<u64, Edge> for IndexHelper {
         if edge.id == 0 {
             edge.id = db::next_id(db)?;
         }
+        // TODO - This should be set by the db if Entity has a trait for setting
+        // the timestamp.  In general, Entity should have Id and Timestamp
+        if edge.ts_nano.len() == 0 {
+            edge.ts_nano = OffsetDateTime::now_utc()
+                .unix_timestamp_nanos()
+                .to_le_bytes()
+                .to_vec();
+        }
+
         edge.type_code = db::type_code(db, &edge.type_name)?;
         Ok(())
     }
@@ -238,10 +250,10 @@ fn test_using_edge_indexes() {
             id: 3u64,
             head: 1u64,
             tail: 2u64,
-            type_name: "foo".into(),
+            type_name: "".into(),
             type_code: 3u64,
-            name: "foo".into(),
-            cas: "".into(),
+            name: "".into(),
+            ts_nano: vec![],
         })
     );
 }

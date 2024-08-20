@@ -1,4 +1,4 @@
-use arrow::datatypes::ToByteSlice;
+//use arrow::datatypes::ToByteSlice;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
@@ -137,6 +137,19 @@ struct OperationsImpl<'a, K: KeyCodec, E: Entity + HasKey<K>> {
     counters: counter::Counters<'a>,
 }
 
+#[test]
+fn test_timestamp() {
+    use time::OffsetDateTime;
+    let now = OffsetDateTime::now_utc();
+    let ts = now.unix_timestamp_nanos();
+    let bytes = ts.to_le_bytes();
+    println!("{now} / {ts} / {:?}", bytes);
+
+    let ts2 = i128::from_le_bytes(bytes);
+    let now2 = OffsetDateTime::from_unix_timestamp_nanos(ts2).unwrap();
+    assert_eq!(now2, now);
+}
+
 impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_, K, E> {
     fn get(&self, id: Id<E>) -> Result<Option<E>, Box<dyn Error>> {
         let cf = self
@@ -251,7 +264,7 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
         trace!("Found cf {:?} with match={:?}", index, match_start);
         let iter = self.db.iterator_cf(
             cf,
-            IteratorMode::From(match_start.to_byte_slice(), Direction::Forward),
+            IteratorMode::From(match_start.as_slice(), Direction::Forward),
         );
         for item in iter {
             let (k, v) = item.unwrap();

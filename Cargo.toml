@@ -7,6 +7,9 @@ edition = "2021"
 
 [dependencies]
 
+# Basics =====
+time = { version = "0.3.36" }
+
 # Filesystem notifications ======
 futures = { version = "0.3.21" }
 async-std = { version = "1.12" }

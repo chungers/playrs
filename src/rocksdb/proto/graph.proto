@@ -4,18 +4,47 @@ package rocksdb.graph.v1;
 
 message Node {
     uint64 id = 1;
-    uint64 type_code = 2;
-    string type_name = 3;
-    string name = 4;
-    string cas = 5;
+    uint64 type_code = 2; // This is the Symbol id
+    string type_name = 3; // TODO deprecate - remove this
+    string name = 4;  // Label of the instance
+    bytes ts_nano = 5;
 }
 
+// Indexes on edge:
+// {id} => value
+// {head, tail, type_code} => edge_id /* latest edge */
+// {head, tail, type_code, ts_nano} => edge_id  /* historical */
 message Edge {
     uint64 id = 1;
-    uint64 type_code = 2;
-    string type_name = 3;
+    uint64 type_code = 2;  // This is the Symbol id.
+    string type_name = 3;  // TODO deprecate - remove this.
     string name = 4;
     uint64 head = 5;
     uint64 tail = 6;
-    string cas = 7;
+    bytes ts_nano = 7;
+}
+
+// The key of an attribute is {parent_id, name}, attribute_proto => current
+// Historical = {parent_id, name, ts_nano}, attribute_proto
+// A put of an attribute will first check the historical index with the
+// content hash of the new attribute.  The current value index is updated
+// only when the last(history(content_hash) != new_value.content_hash
+// Indexes
+// For node attrbutes -
+// {node_id, name} =>
+message Attribute {
+    uint64 parent_id = 1; // Id of the Edge or Node it's attached to.'
+    string name = 2;
+    bytes content = 3;
+    string content_type = 4;
+    bytes content_hash = 5;
+    bytes ts_nano = 6;
+}
+
+message Symbol {
+    uint64 id = 1;
+    string name = 2;  // e.g. "depends-on""
+    bytes name_hash = 3;  // e.g. sha256("depends-on")
+    string doc = 4; // e.g. "Specifies a dependency of one entity to another."
+    bytes ts_nano = 5;
 }
