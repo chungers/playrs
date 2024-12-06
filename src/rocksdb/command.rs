@@ -3,7 +3,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::rocksdb::db::{self, HasKey, Visitor};
 use crate::rocksdb::edge::{self, EdgeCollector, EdgePrinter};
-use crate::rocksdb::graph::{Edge, Node};
+use crate::rocksdb::graph::{Edge, Id, Node};
 use crate::rocksdb::index::Index;
 use crate::rocksdb::node;
 use crate::rocksdb::node::NodePrinter;
@@ -317,7 +317,7 @@ pub fn go(cmd: &Command) {
                         None => 0,
                     };
                     let mut node = Node {
-                        id,
+                        id: Some(Id { value: id }),
                         type_name: match &args.type_name {
                             Some(v) => v.to_string(),
                             None => "entity".to_string(),
@@ -397,7 +397,7 @@ pub fn go(cmd: &Command) {
                                 Ok(Some(tail)) => {
                                     trace!("{:?} --{:?}-> {:?}", head, args.name, tail);
                                     let mut edge = Edge {
-                                        id: 0,
+                                        id: Some(Id { value: 0 }),
                                         head: head.id,
                                         tail: tail.id,
                                         type_name: match &args.type_name {
@@ -426,9 +426,9 @@ pub fn go(cmd: &Command) {
                         None => 0,
                     };
                     let mut edge = Edge {
-                        id,
-                        head: args.head,
-                        tail: args.tail,
+                        id: Some(Id { value: id }),
+                        head: Some(Id { value: args.head }),
+                        tail: Some(Id { value: args.tail }),
                         type_name: match &args.type_name {
                             Some(v) => v.to_string(),
                             None => args.name.clone(),
@@ -484,13 +484,19 @@ pub fn go(cmd: &Command) {
                             let edge_ops = Edge::operations(&database);
                             match edge_ops.match_bytes(
                                 &edge::ByHeadTail.cf_name().to_string(),
-                                head.id.to_le_bytes().to_vec(),
+                                head.id
+                                    .unwrap_or(Id { value: 0 })
+                                    .value
+                                    .to_le_bytes()
+                                    .to_vec(),
                                 Box::new(visitor),
                             ) {
                                 Ok(()) => {
                                     for f in buffer.iter() {
                                         if !args.raw {
-                                            match node_ops.get(Node::id_from(f.tail)) {
+                                            match node_ops.get(Node::id_from(
+                                                f.tail.unwrap_or(Id { value: 0 }).value,
+                                            )) {
                                                 Ok(Some(tail)) => println!(
                                                     "{:?} {:?} {:?}",
                                                     head.name, f.name, tail.name
@@ -523,13 +529,19 @@ pub fn go(cmd: &Command) {
                             let edge_ops = Edge::operations(&database);
                             match edge_ops.match_bytes(
                                 &edge::ByTailHead.cf_name().to_string(),
-                                tail.id.to_le_bytes().to_vec(),
+                                tail.id
+                                    .unwrap_or(Id { value: 0 })
+                                    .value
+                                    .to_le_bytes()
+                                    .to_vec(),
                                 Box::new(visitor),
                             ) {
                                 Ok(()) => {
                                     for f in buffer.iter() {
                                         if !args.raw {
-                                            match node_ops.get(Node::id_from(f.head)) {
+                                            match node_ops.get(Node::id_from(
+                                                f.head.unwrap_or(Id { value: 0 }).value,
+                                            )) {
                                                 Ok(Some(head)) => println!(
                                                     "{:?} {:?} {:?}",
                                                     head.name, f.name, tail.name

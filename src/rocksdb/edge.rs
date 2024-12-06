@@ -14,7 +14,7 @@ use time::OffsetDateTime;
 
 impl db::HasKey<u64> for Edge {
     fn key(&self) -> Option<u64> {
-        if self.id > 0 {
+        if self.id.unwrap_or_default() > 0 {
             Some(self.id)
         } else {
             None

@@ -16,13 +16,21 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::path::Path;
 
+pub type Database = DBWithThreadMode<SingleThreaded>;
+pub type Transaction = WriteBatchWithTransaction<false>;
+
 pub trait DbInfo {
     fn path(&self) -> &str;
     fn options(&self) -> rocksdb::Options;
 }
 
-pub type Database = DBWithThreadMode<SingleThreaded>;
-pub type Transaction = WriteBatchWithTransaction<false>;
+pub trait Entity: std::cmp::PartialEq + std::fmt::Debug {
+    const TYPE: &'static str;
+    fn as_bytes(&self) -> Vec<u8>;
+    fn from_bytes(key: &[u8], bytes: &[u8]) -> Result<Self, Box<dyn Error>>
+    where
+        Self: Sized;
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Id<E: Entity + ?Sized> {
@@ -69,14 +77,6 @@ pub trait HasKey<K: KeyCodec> {
             phantom: PhantomData::<Self>,
         }
     }
-}
-
-pub trait Entity: std::cmp::PartialEq + std::fmt::Debug {
-    const TYPE: &'static str;
-    fn as_bytes(&self) -> Vec<u8>;
-    fn from_bytes(key: &[u8], bytes: &[u8]) -> Result<Self, Box<dyn Error>>
-    where
-        Self: Sized;
 }
 
 impl KeyCodec for u64 {
@@ -162,6 +162,7 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
             Err(e) => Err(Box::new(e)),
         }
     }
+
     fn put(&mut self, o: &mut E) -> Result<Id<E>, Box<dyn Error>> {
         self.custom.before_put(self.db, o)?;
 

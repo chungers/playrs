@@ -2,8 +2,17 @@ syntax = "proto3";
 
 package rocksdb.graph.v1;
 
+message Id {
+    uint64 value = 1;
+}
+
+message Type {
+    uint64 Id = 1; // This is the Symbol id
+    string name = 2; // TODO deprecate - remove this
+}
+
 message Node {
-    uint64 id = 1;
+    Id id = 1;
     uint64 type_code = 2; // This is the Symbol id
     string type_name = 3; // TODO deprecate - remove this
     string name = 4;  // Label of the instance
@@ -15,12 +24,12 @@ message Node {
 // {head, tail, type_code} => edge_id /* latest edge */
 // {head, tail, type_code, ts_nano} => edge_id  /* historical */
 message Edge {
-    uint64 id = 1;
+    Id id = 1;
     uint64 type_code = 2;  // This is the Symbol id.
     string type_name = 3;  // TODO deprecate - remove this.
     string name = 4;
-    uint64 head = 5;
-    uint64 tail = 6;
+    Id head = 5;
+    Id tail = 6;
     bytes ts_nano = 7;
 }
 
@@ -29,11 +38,14 @@ message Edge {
 // A put of an attribute will first check the historical index with the
 // content hash of the new attribute.  The current value index is updated
 // only when the last(history(content_hash) != new_value.content_hash
-// Indexes
-// For node attrbutes -
-// {node_id, name} =>
+//
+// ATTR_LOG = {parent_id, name, ts_nano} => proto (versioned)
+// ATTR_PARENT_ID_NAME = {parent_id, name} => proto (latest)
+// ATTR_NAME_PARENT_ID = {name, parent_id} => {} // if exists, lookup by node_id,name
+// ?? Should name be a symbol id so that attribute names are canonicalized?
+//
 message Attribute {
-    uint64 parent_id = 1; // Id of the Edge or Node it's attached to.'
+    Id parent = 1; // Id of the Edge or Node it's attached to.'
     string name = 2;
     bytes content = 3;
     string content_type = 4;
@@ -42,9 +54,42 @@ message Attribute {
 }
 
 message Symbol {
-    uint64 id = 1;
+    Id id = 1;
     string name = 2;  // e.g. "depends-on""
     bytes name_hash = 3;  // e.g. sha256("depends-on")
     string doc = 4; // e.g. "Specifies a dependency of one entity to another."
     bytes ts_nano = 5;
+}
+
+message NodeAttribute {
+    Node node = 1;
+    Attribute attr = 2;
+}
+
+service Attributes {
+    rpc create_node_attribute(NodeAttribute) returns (Attribute) {}
+    rpc node_attributes(Node) returns (stream Attribute) {}
+}
+
+message Query {
+    oneof by {
+        string name = 1;
+        string prefix = 2;
+        string kind_name = 3;
+        uint32 kind_code = 4;
+    }
+}
+
+service Graph {
+    rpc create_node(Node) returns (Node) {}
+    rpc read_node(Id) returns (Node) {}
+    rpc update_node(Node) returns (Node) {}
+    rpc delete_node(Node) returns (Node) {}
+    rpc query_nodes(Query) returns (stream Node) {}
+
+    rpc create_edge(Edge) returns (Edge) {}
+    rpc read_edge(Id) returns (Edge) {}
+    rpc update_edge(Edge) returns (Edge) {}
+    rpc delete_edge(Edge) returns (Edge) {}
+    rpc query_edges(Query) returns (stream Edge) {}
 }
