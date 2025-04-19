@@ -28,6 +28,20 @@ Download and install MacDown for .md files
 brew install --cask macdown
 ```
 
+### Managing Rust dependencies
+
+Install cargo-edit 
+
+```
+cargo install cargo-edit
+```
+
+Running from project directory:
+
+```
+cargo upgrade -i --dry-run
+```
+
 Install cargo-upgrades to track latest versions of crates
 
 ```
