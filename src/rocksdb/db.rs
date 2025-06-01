@@ -98,7 +98,7 @@ pub trait OperationsBuilder<E: Entity> {
 pub trait Operations<E: Entity> {
     fn get(&self, id: Id<E>) -> Result<Option<E>, Box<dyn Error>>;
     fn put(&mut self, e: &mut E) -> Result<Id<E>, Box<dyn Error>>;
-    fn delete(&self, e: &E) -> Result<bool, Box<dyn Error>>;
+    fn delete(&mut self, e: &E) -> Result<bool, Box<dyn Error>>;
     fn visit(
         &self,
         start_id: Id<E>,
@@ -214,8 +214,47 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
         Ok(o.id())
     }
 
-    fn delete(&self, _o: &E) -> Result<bool, Box<dyn Error>> {
-        todo!()
+    fn delete(&mut self, o: &E) -> Result<bool, Box<dyn Error>> {
+        // Check if the entity exists first
+        match self.get(o.id())? {
+            Some(found) => {
+                let mut txn = Transaction::default();
+
+                // Delete all index entries for this entity
+                let _: Vec<_> = self
+                    .custom
+                    .indexes()
+                    .iter()
+                    .map(|index| {
+                        let _ = index.delete_entry(self.db, &mut txn, &found);
+                        trace!("Scheduled deletion of entity={:?}", found);
+                    })
+                    .collect();
+
+                // Delete the actual entity from the value index
+                let cf = self
+                    .db
+                    .cf_handle(self.custom.value_index().cf_name())
+                    .unwrap();
+                txn.delete_cf(cf, o.id().as_bytes());
+
+                // Update counter for the type (decrement)
+                let mut counter = self.counters.get(E::TYPE)?;
+                if counter.get() > 0 {
+                    counter.set(counter.get() - 1);
+                    self.counters.update(&mut txn, &counter)?;
+                }
+
+                // Commit the transaction
+                self.db.write(txn)?;
+
+                Ok(true)
+            }
+            None => {
+                // Entity does not exist, return false
+                Ok(false)
+            }
+        }
     }
 
     fn visit(

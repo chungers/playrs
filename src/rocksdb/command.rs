@@ -109,6 +109,7 @@ pub struct NodeCommand {
 #[derive(Debug, Subcommand)]
 pub enum NodeVerb {
     Put(NodePutArgs),
+    Delete(NodeDeleteArgs),
     Get(NodeGetArgs),
     List(NodeListArgs),
     ByName(NodeByNameArgs),
@@ -127,6 +128,12 @@ pub struct NodePutArgs {
     /// The id of the node
     #[clap(long = "id")]
     id: Option<u64>,
+}
+
+#[derive(Debug, clapArgs)]
+pub struct NodeDeleteArgs {
+    /// The id of the node
+    id: u64,
 }
 
 #[derive(Debug, clapArgs)]
@@ -331,6 +338,33 @@ pub fn go(cmd: &Command) {
                     let result = ops.put(&mut node);
 
                     info!("Result: {:?}", result);
+                }
+                NodeVerb::Delete(args) => {
+                    let mut ops = Node::operations(&database);
+                    
+                    // First get the node
+                    match ops.get(Node::id_from(args.id)) {
+                        Ok(Some(node)) => {
+                            // Node found, try to delete it
+                            match ops.delete(&node) {
+                                Ok(true) => {
+                                    info!("Node {} deleted successfully", args.id);
+                                },
+                                Ok(false) => {
+                                    info!("Node {} could not be deleted", args.id);
+                                },
+                                Err(e) => {
+                                    error!("Error deleting node {}: {:?}", args.id, e);
+                                }
+                            }
+                        },
+                        Ok(None) => {
+                            info!("Node {} not found", args.id);
+                        },
+                        Err(e) => {
+                            error!("Error retrieving node {}: {:?}", args.id, e);
+                        }
+                    }
                 }
                 NodeVerb::Get(args) => {
                     let ops = Node::operations(&database);

@@ -104,6 +104,7 @@ impl ErrNoSuchNode {
         ErrNoSuchNode { name }
     }
 }
+
 impl Error for ErrNoSuchNode {}
 
 impl std::fmt::Display for ErrNoSuchNode {
