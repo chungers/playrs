@@ -19,7 +19,7 @@ notify = { version = "6.1.1" }
 
 # Apache Arrow ===
 # Used by Duckdb example also
-arrow = { version = "52.2.0" }
+arrow = { version = "54.0" }
 # === Apache Arrow
 
 # CLI ============
@@ -55,7 +55,7 @@ tonic-reflection = "0.12.1"
 tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread"] }
 prost = { version = "0.13.1" }
 prost-types = { version = "0.13.1" }
-chrono = { version = "0.4.31", default-features = false }
+chrono = { version = "0.4.41", default-features = false }
 tower = "0.4.13"
 # ======================== GRPC
 
