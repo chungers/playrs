@@ -5,7 +5,10 @@ use tracing::{debug, error, info, trace, warn};
 pub mod command;
 mod counter;
 mod db;
+
 mod edge;
+#[cfg(test)]
+mod edge_test;
 mod error;
 mod index;
 mod node;

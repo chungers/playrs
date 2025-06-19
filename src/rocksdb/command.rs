@@ -186,6 +186,7 @@ pub struct NodeNameArgs {
 #[derive(Debug, Subcommand)]
 pub enum EdgeVerb {
     Put(EdgePutArgs),
+    Delete(EdgeDeleteArgs),
     Associate(EdgeRelArgs),
     Get(EdgeGetArgs),
     List(EdgeListArgs),
@@ -230,6 +231,12 @@ pub struct EdgeRelArgs {
 #[derive(Debug, clapArgs)]
 pub struct EdgeGetArgs {
     /// The id of the node
+    id: u64,
+}
+
+#[derive(Debug, clapArgs)]
+pub struct EdgeDeleteArgs {
+    /// The id of the edge
     id: u64,
 }
 
@@ -542,6 +549,33 @@ pub fn go(cmd: &Command) {
                         }
                         Ok(None) => error!("Node from {:?} not found.", args.name),
                         Err(e) => error!("Error: {:?}", e),
+                    }
+                }
+                EdgeVerb::Delete(args) => {
+                    let mut ops = Edge::operations(&database);
+                    
+                    // First get the edge
+                    match ops.get(Edge::id_from(args.id)) {
+                        Ok(Some(edge)) => {
+                            // Edge found, try to delete it
+                            match ops.delete(&edge) {
+                                Ok(true) => {
+                                    info!("Edge {} deleted successfully", args.id);
+                                },
+                                Ok(false) => {
+                                    info!("Edge {} could not be deleted", args.id);
+                                },
+                                Err(e) => {
+                                    error!("Error deleting edge {}: {:?}", args.id, e);
+                                }
+                            }
+                        },
+                        Ok(None) => {
+                            info!("Edge {} not found", args.id);
+                        },
+                        Err(e) => {
+                            error!("Error retrieving edge {}: {:?}", args.id, e);
+                        }
                     }
                 }
                 EdgeVerb::To(args) => {

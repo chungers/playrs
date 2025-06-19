@@ -51,12 +51,11 @@ pub trait Index<E: db::Entity> {
             Some(cf) => {
                 let kv = self.key_value(e);
                 trace!(
-                    "Delete entry in index {:?}, (k,v) = ({:?},{:?})",
+                    "Delete entry in index {:?}, key = {:?}",
                     self.cf_name(),
                     kv.0,
-                    kv.1,
                 );
-                txn.put_cf(cf, kv.0, vec![]);
+                txn.delete_cf(cf, kv.0);
                 Ok(())
             }
             None => {
