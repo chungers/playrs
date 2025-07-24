@@ -18,7 +18,6 @@ fn main() {
     gen_proto("./src/grpc/proto/hello.proto", "./src/grpc");
     gen_proto("./src/rocksdb/proto/graph.proto", "./src/rocksdb");
 }
-
 fn gen_proto(proto_file: &str, out_dir: &str) {
     tonic_build::configure()
         .build_server(true)
