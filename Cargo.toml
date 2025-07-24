@@ -8,38 +8,36 @@ edition = "2021"
 [dependencies]
 
 # Basics =====
-time = { version = "0.3.36" }
+time = { version = "0.3.41" }
+signal-hook = { version = "0.3.17" }
+tempfile = { version = "3" }
 
 # Filesystem notifications ======
-futures = { version = "0.3.21" }
-async-std = { version = "1.12" }
-crossbeam-channel = { version = "0.5.5" }
-notify = { version = "6.1.1" }
+futures = { version = "0.3.31" }
+async-std = { version = "1.13" }
+crossbeam-channel = { version = "0.5.15" }
+notify = { version = "8.0.0" }
 # ====== Filesystem notifications
 
 # Apache Arrow ===
 # Used by Duckdb example also
-arrow = { version = "54.0" }
+arrow = { version = "55.0" }
 # === Apache Arrow
 
 # CLI ============
-clap = { version = "4.1.5", features = ["derive", "env"] }
+clap = { version = "4.5", features = ["derive", "env"] }
 # ============ CLI
 
 # SERDE ==========
-serde = { version = "1.0.137", features = ["derive"] }
+serde = { version = "1.0.219", features = ["derive"] }
 # JSON
-serde_json = { version = "1.0.81" }
+serde_json = { version = "1.0.140" }
 # YAML
 serde_yaml = { version = "0.9" }
 # ========== SERDE
 
-
-signal-hook = { version = "0.3.14" }
-tempfile = { version = "3" }
-
 # Logging / Tracing ==========
-tera = { version = "1.16" }
+tera = { version = "1.20" }
 tracing = { version = "0.1" }
 tracing-appender = { version = "0.2" }
 tracing-subscriber = { version = "0.3" }
@@ -50,26 +48,26 @@ simple-error = { version = "0.3.1" }
 
 # GRPC ========================
 # https://www.swiftdiaries.com/rust/tonic/
-tonic = { version = "0.12.1", features = ["tls"] }
-tonic-reflection = "0.12.1"
-tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread"] }
-prost = { version = "0.13.1" }
-prost-types = { version = "0.13.1" }
+tonic = { version = "0.13.0", features = ["tls"] }
+tonic-reflection = "0.13.0"
+tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread"] }
+prost = { version = "0.13.5" }
+prost-types = { version = "0.13.5" }
 chrono = { version = "0.4.41", default-features = false }
-tower = "0.4.13"
+tower = "0.5.2"
 # ======================== GRPC
 
-
 # DuckDB =====================
-duckdb = { version = "1.0.0", features = ["bundled"] }
+duckdb = { version = "1.2", features = ["bundled"] }
 # ===================== DuckDB
+
 
 # RocksDB =====================
 # https://docs.rs/rocksdb/0.21.0/rocksdb/
-rocksdb = { version = "0.22" }
+rocksdb = { version = "0.23" }
 # ===================== RocksDB
 
 [build-dependencies]
 
 # GRPC
-tonic-build = { version = "0.12.1" }
+tonic-build = { version = "0.13.0" }

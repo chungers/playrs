@@ -19,7 +19,7 @@ use std::str::FromStr;
 #[clap(author = "chunger",
        version,
        about = "This is a simple learning exercise in Rust.",
-       long_about = None)]
+       long_about = format!("playrs, branch={:?}, version={:?}", env!("GIT_BRANCH"), env!("GIT_HASH")))]
 #[clap(propagate_version = true)]
 struct Cli {
     #[clap(subcommand)]
