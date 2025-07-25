@@ -4,7 +4,7 @@ use tracing::{debug, error, info, trace, warn};
 use crate::rocksdb::db::{self, HasKey, Visitor};
 use crate::rocksdb::edge::{self, EdgeCollector, EdgePrinter};
 use crate::rocksdb::graph::{Edge, Node};
-use crate::rocksdb::index::Index;
+use crate::rocksdb::index::{Index, Indexes};
 use crate::rocksdb::node;
 use crate::rocksdb::node::NodePrinter;
 use crate::rocksdb::All;
@@ -108,12 +108,21 @@ pub struct NodeCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum NodeVerb {
+    Hash(NodeHashArgs),
     Put(NodePutArgs),
     Delete(NodeDeleteArgs),
     Get(NodeGetArgs),
     List(NodeListArgs),
     ByName(NodeByNameArgs),
+    Lookup(NodeLookupArgs),
     First(NodeFirstArgs),
+}
+
+#[derive(Debug, clapArgs)]
+pub struct NodeHashArgs {
+    /// The id of the node
+    #[clap(long = "id")]
+    id: u64,
 }
 
 #[derive(Debug, clapArgs)]
@@ -140,6 +149,16 @@ pub struct NodeDeleteArgs {
 pub struct NodeGetArgs {
     /// The id of the node
     id: u64,
+}
+
+#[derive(Debug, clapArgs)]
+pub struct NodeLookupArgs {
+    /// Index to lookup
+    index: String,
+    /// Match bytes
+    match_string: String,
+    /// How many to return.  1 == exact match.
+    n: usize,
 }
 
 #[derive(Debug, clapArgs)]
@@ -325,6 +344,28 @@ pub fn go(cmd: &Command) {
             let database = db::open_db(&cmd.db, &All).unwrap();
 
             match &ncmd.verb {
+                NodeVerb::Hash(args) => {
+                    let ops = Node::operations(&database);
+                    let result = ops.get(Node::id_from(args.id));
+
+                    trace!("Result: {:?}", result);
+                    match result {
+                        Ok(Some(node)) => {
+                            let name_hash = node.name_hash();
+                            info!("node.name: '{}'", node.name);
+                            info!("name_hash (SHA-256): {}", name_hash);
+
+                            let mut p = NodePrinter(1);
+                            p.visit(node);
+                        }
+                        Ok(None) => {
+                            info!("not found");
+                        }
+                        Err(e) => {
+                            error!("Error: {:?}", e);
+                        }
+                    }
+                }
                 NodeVerb::Put(args) => {
                     let id: u64 = match args.id {
                         Some(v) => v,
@@ -348,7 +389,7 @@ pub fn go(cmd: &Command) {
                 }
                 NodeVerb::Delete(args) => {
                     let mut ops = Node::operations(&database);
-                    
+
                     // First get the node
                     match ops.get(Node::id_from(args.id)) {
                         Ok(Some(node)) => {
@@ -356,18 +397,18 @@ pub fn go(cmd: &Command) {
                             match ops.delete(&node) {
                                 Ok(true) => {
                                     info!("Node {} deleted successfully", args.id);
-                                },
+                                }
                                 Ok(false) => {
                                     info!("Node {} could not be deleted", args.id);
-                                },
+                                }
                                 Err(e) => {
                                     error!("Error deleting node {}: {:?}", args.id, e);
                                 }
                             }
-                        },
+                        }
                         Ok(None) => {
                             info!("Node {} not found", args.id);
-                        },
+                        }
                         Err(e) => {
                             error!("Error retrieving node {}: {:?}", args.id, e);
                         }
@@ -409,6 +450,28 @@ pub fn go(cmd: &Command) {
                     ) {
                         Ok(()) => trace!("Done."),
                         Err(e) => error!("Error: {:?}", e),
+                    }
+                }
+                NodeVerb::Lookup(args) => {
+                    trace!("Lookup by index: {:?}", args);
+
+                    let index = match Node::get(&args.index) {
+                        Ok(index) => index,
+                        Err(e) => {
+                            error!("Error: {:?}", e);
+                            return;
+                        }
+                    };
+
+                    match index.scan(
+                        &database,
+                        args.match_string.as_bytes().to_vec(),
+                        Box::new(NodePrinter(args.n)),
+                    ) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            error!("Error during scan: {:?}", e);
+                        }
                     }
                 }
                 NodeVerb::First(args) => {
@@ -553,7 +616,7 @@ pub fn go(cmd: &Command) {
                 }
                 EdgeVerb::Delete(args) => {
                     let mut ops = Edge::operations(&database);
-                    
+
                     // First get the edge
                     match ops.get(Edge::id_from(args.id)) {
                         Ok(Some(edge)) => {
@@ -561,18 +624,18 @@ pub fn go(cmd: &Command) {
                             match ops.delete(&edge) {
                                 Ok(true) => {
                                     info!("Edge {} deleted successfully", args.id);
-                                },
+                                }
                                 Ok(false) => {
                                     info!("Edge {} could not be deleted", args.id);
-                                },
+                                }
                                 Err(e) => {
                                     error!("Error deleting edge {}: {:?}", args.id, e);
                                 }
                             }
-                        },
+                        }
                         Ok(None) => {
                             info!("Edge {} not found", args.id);
-                        },
+                        }
                         Err(e) => {
                             error!("Error retrieving edge {}: {:?}", args.id, e);
                         }

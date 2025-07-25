@@ -5,6 +5,7 @@ use prost::Message; // need the trait to encode protobuf
 
 use crate::rocksdb::db;
 use crate::rocksdb::graph::Node;
+use crate::rocksdb::hash;
 use crate::rocksdb::index::{Index, Indexes};
 
 use std::error::Error;
@@ -34,6 +35,13 @@ impl db::Entity for Node {
 impl db::OperationsBuilder<Node> for Node {
     fn operations(db: &db::Database) -> Box<dyn db::Operations<Node> + '_> {
         db::entity_operations::<u64, Node>(db, Box::new(IndexHelper {}))
+    }
+}
+
+impl Node {
+    /// Compute SHA-256 hash of the node's name
+    pub fn name_hash(&self) -> String {
+        hash::compute_sha256_hash(&self.name)
     }
 }
 
@@ -84,6 +92,8 @@ impl Indexes<Node> for Node {
             Box::new(ByType),
             // By name
             Box::new(ByName),
+            // By name_hash
+            Box::new(ByNameHash),
         ];
     }
 }
@@ -102,6 +112,9 @@ pub struct ByType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ByName;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ByNameHash;
 
 impl Index<Node> for ById {
     fn cf_name(&self) -> &'static str {
@@ -143,6 +156,29 @@ impl Index<Node> for ByName {
     }
 }
 
+impl Index<Node> for ByNameHash {
+    fn cf_name(&self) -> &'static str {
+        "index.node.name_hash"
+    }
+    fn append_only(&self) -> bool {
+        true
+    }
+    fn key_value(&self, n: &Node) -> (Vec<u8>, Vec<u8>) {
+        trace!(
+            "key_value = [{:?}, {:?}={:?}], obj={:?}",
+            n.name,
+            n.id,
+            n.id.to_le_bytes().to_vec(),
+            n
+        );
+        //       (n.name.encode_to_vec(), n.id.to_le_bytes().to_vec())
+        (
+            n.name_hash().as_bytes().to_vec(),
+            n.id.to_le_bytes().to_vec(),
+        )
+    }
+}
+
 #[test]
 fn test_using_node_indexes() {
     let mut cfs: Vec<&str> = Vec::<&str>::new();
@@ -181,4 +217,37 @@ fn test_using_node_id() {
     use db::HasKey;
     println!("Got id = {:?}", node.id());
     println!("Id from raw = {:?}", Node::id_from(1u64));
+}
+
+#[test]
+fn test_node_name_hash() {
+    let node = Node {
+        id: 1u64,
+        type_name: "entity".into(),
+        type_code: 2u64,
+        name: "test_node".into(),
+        ts_nano: vec![],
+    };
+
+    let hash = node.name_hash();
+    println!("Node name hash: {}", hash);
+    assert_eq!(
+        hash,
+        "55f3cc97541a60372fc6eb73be4a9ca056a36d937844875d43570ca8b1dc1e30"
+    );
+
+    // Test with empty name
+    let empty_node = Node {
+        id: 2u64,
+        type_name: "entity".into(),
+        type_code: 2u64,
+        name: "".into(),
+        ts_nano: vec![],
+    };
+
+    let empty_hash = empty_node.name_hash();
+    assert_eq!(
+        empty_hash,
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
 }

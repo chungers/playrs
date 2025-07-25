@@ -67,6 +67,10 @@ duckdb = { version = "1.2", features = ["bundled"] }
 rocksdb = { version = "0.23" }
 # ===================== RocksDB
 
+# Cryptography ================
+sha2 = { version = "0.10" }
+# ================ Cryptography
+
 [build-dependencies]
 
 # GRPC

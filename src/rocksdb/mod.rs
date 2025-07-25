@@ -10,6 +10,7 @@ mod edge;
 #[cfg(test)]
 mod edge_test;
 mod error;
+pub mod hash;
 mod index;
 mod node;
 #[cfg(test)]
