@@ -160,7 +160,7 @@ impl Index<Node> for ByNameHash {
     fn cf_name(&self) -> &'static str {
         "index.node.name_hash"
     }
-    fn append_only(&self) -> bool {
+    fn prefixed_keys(&self) -> bool {
         true
     }
     fn key_value(&self, n: &Node) -> (Vec<u8>, Vec<u8>) {

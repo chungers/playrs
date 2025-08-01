@@ -4,7 +4,7 @@ use tracing::{debug, error, info, trace, warn};
 use crate::rocksdb::db::{self, HasKey, Visitor};
 use crate::rocksdb::edge::{self, EdgeCollector, EdgePrinter};
 use crate::rocksdb::graph::{Edge, Node};
-use crate::rocksdb::index::{Index, Indexes};
+use crate::rocksdb::index::Index;
 use crate::rocksdb::node;
 use crate::rocksdb::node::NodePrinter;
 use crate::rocksdb::All;
@@ -113,9 +113,8 @@ pub enum NodeVerb {
     Delete(NodeDeleteArgs),
     Get(NodeGetArgs),
     List(NodeListArgs),
-    ByName(NodeByNameArgs),
     Lookup(NodeLookupArgs),
-    First(NodeFirstArgs),
+    Exact(NodeExactArgs),
 }
 
 #[derive(Debug, clapArgs)]
@@ -162,15 +161,7 @@ pub struct NodeLookupArgs {
 }
 
 #[derive(Debug, clapArgs)]
-pub struct NodeByNameArgs {
-    /// Match bytes
-    match_string: String,
-    /// How many to return.  1 == exact match.
-    n: usize,
-}
-
-#[derive(Debug, clapArgs)]
-pub struct NodeFirstArgs {
+pub struct NodeExactArgs {
     /// The name of the index
     index: String,
 
@@ -440,44 +431,41 @@ pub fn go(cmd: &Command) {
                         Err(e) => error!("Error: {:?}", e),
                     }
                 }
-                NodeVerb::ByName(args) => {
+                NodeVerb::Lookup(args) => {
                     trace!("Lookup by index: {:?}", args);
                     let ops = Node::operations(&database);
-                    match ops.match_bytes(
-                        &node::ByName.cf_name().to_string(),
+                    match ops.scan(
+                        &args.index,
                         args.match_string.as_bytes().to_vec(),
                         Box::new(NodePrinter(args.n)),
                     ) {
                         Ok(()) => trace!("Done."),
                         Err(e) => error!("Error: {:?}", e),
                     }
-                }
-                NodeVerb::Lookup(args) => {
-                    trace!("Lookup by index: {:?}", args);
 
-                    let index = match Node::get(&args.index) {
-                        Ok(index) => index,
-                        Err(e) => {
-                            error!("Error: {:?}", e);
-                            return;
-                        }
-                    };
+                    // let index = match Node::get(&args.index) {
+                    //     Ok(index) => index,
+                    //     Err(e) => {
+                    //         error!("Error: {:?}", e);
+                    //         return;
+                    //     }
+                    // };
 
-                    match index.scan(
-                        &database,
-                        args.match_string.as_bytes().to_vec(),
-                        Box::new(NodePrinter(args.n)),
-                    ) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            error!("Error during scan: {:?}", e);
-                        }
-                    }
+                    // match index.scan(
+                    //     &database,
+                    //     args.match_string.as_bytes().to_vec(),
+                    //     Box::new(NodePrinter(args.n)),
+                    // ) {
+                    //     Ok(_) => {}
+                    //     Err(e) => {
+                    //         error!("Error during scan: {:?}", e);
+                    //     }
+                    // }
                 }
-                NodeVerb::First(args) => {
+                NodeVerb::Exact(args) => {
                     trace!("First in index: {:?}", args);
                     let ops = Node::operations(&database);
-                    match ops.exact(&args.index, args.match_string.as_bytes()) {
+                    match ops.first(&args.index, args.match_string.as_bytes()) {
                         Ok(Some(obj)) => println!("{:?}", obj),
                         Ok(None) => println!("Not found."),
                         Err(e) => error!("Error: {:?}", e),
@@ -492,11 +480,11 @@ pub fn go(cmd: &Command) {
                 EdgeVerb::Associate(args) => {
                     // Look up the head and tail by name
                     let node_ops = Node::operations(&database);
-                    match node_ops.exact(&node::ByName.cf_name().to_string(), args.head.as_bytes())
+                    match node_ops.first(&node::ByName.cf_name().to_string(), args.head.as_bytes())
                     {
                         Ok(Some(head)) => {
                             match node_ops
-                                .exact(&node::ByName.cf_name().to_string(), args.tail.as_bytes())
+                                .first(&node::ByName.cf_name().to_string(), args.tail.as_bytes())
                             {
                                 Ok(Some(tail)) => {
                                     trace!("{:?} --{:?}-> {:?}", head, args.name, tail);
@@ -582,11 +570,11 @@ pub fn go(cmd: &Command) {
                     let visitor = EdgeCollector::new(&mut buffer, usize::max_value());
                     // Look up the head and tail by name
                     let node_ops = Node::operations(&database);
-                    match node_ops.exact(&node::ByName.cf_name().to_string(), args.name.as_bytes())
+                    match node_ops.first(&node::ByName.cf_name().to_string(), args.name.as_bytes())
                     {
                         Ok(Some(head)) => {
                             let edge_ops = Edge::operations(&database);
-                            match edge_ops.match_bytes(
+                            match edge_ops.scan(
                                 &edge::ByHeadTail.cf_name().to_string(),
                                 head.id.to_le_bytes().to_vec(),
                                 Box::new(visitor),
@@ -648,11 +636,11 @@ pub fn go(cmd: &Command) {
 
                     // Look up the head and tail by name
                     let node_ops = Node::operations(&database);
-                    match node_ops.exact(&node::ByName.cf_name().to_string(), args.name.as_bytes())
+                    match node_ops.first(&node::ByName.cf_name().to_string(), args.name.as_bytes())
                     {
                         Ok(Some(tail)) => {
                             let edge_ops = Edge::operations(&database);
-                            match edge_ops.match_bytes(
+                            match edge_ops.scan(
                                 &edge::ByTailHead.cf_name().to_string(),
                                 tail.id.to_le_bytes().to_vec(),
                                 Box::new(visitor),

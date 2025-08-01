@@ -104,8 +104,8 @@ pub trait Operations<E: Entity> {
         start_id: Id<E>,
         visitor: Box<dyn Visitor<E> + '_>,
     ) -> Result<(), Box<dyn Error>>;
-    fn exact(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>>;
-    fn match_bytes(
+    fn first(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>>;
+    fn scan(
         &self,
         index: &String,
         match_start: Vec<u8>, //&[u8],
@@ -281,7 +281,7 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
         Ok(())
     }
 
-    fn exact(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>> {
+    fn first(&self, index: &String, match_bytes: &[u8]) -> Result<Option<E>, Box<dyn Error>> {
         let cf = self.db.cf_handle(index.as_str()).unwrap();
         match self.db.get_cf(cf, match_bytes) {
             Ok(Some(bytes)) => {
@@ -293,7 +293,7 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
         }
     }
 
-    fn match_bytes(
+    fn scan(
         &self,
         index: &String,
         match_start: Vec<u8>, //&[u8],
@@ -307,16 +307,16 @@ impl<'a, K: KeyCodec, E: Entity + HasKey<K>> Operations<E> for OperationsImpl<'_
         );
         for item in iter {
             let (k, v) = item.unwrap();
-            if v.len() == 0 {
-                break;
-            }
             // The first bytes must match
-            if k.len() < match_start.len() {
-                break;
-            } else if match_start.to_owned() != k[0..match_start.len()] {
+            if k.len() < match_start.len() || match_start.to_owned() != k[0..match_start.len()] {
                 break;
             }
             trace!("For match={:?}, (k,v)={:?} | {:?}", match_start, k, v);
+            if v.len() == 0 {
+                warn!("Bad value: index={:?}, k={:?}", index, k);
+                break;
+            }
+
             let id = E::id_from(KeyCodec::decode_key(v.to_vec()));
             let stop: Result<bool, Box<dyn Error>> = match self.get(id)? {
                 Some(obj) => Ok(!visitor.visit(obj)),
