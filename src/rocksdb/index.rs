@@ -49,12 +49,6 @@ pub trait Index<E: db::Entity> {
             if v.len() == 0 {
                 break;
             }
-            trace!(
-                "For match={:?}, (k,v)={:?} | {:?}",
-                match_start,
-                String::from_utf8_lossy(&k),
-                v
-            );
             // The first bytes must match
             if k.len() < match_start.len() {
                 break;
