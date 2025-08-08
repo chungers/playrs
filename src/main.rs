@@ -1,4 +1,5 @@
 mod duckdb;
+mod embedding;
 mod grpc;
 mod rocksdb;
 mod serde;
@@ -49,6 +50,9 @@ enum Commands {
 
     /// Notify (watch files) examples
     Watch(watch::command::Command),
+
+    /// Embedding examples
+    Embedding(embedding::command::Command),
 }
 
 fn main() {
@@ -88,6 +92,9 @@ fn main() {
         }
         Commands::Duckdb(args) => {
             duckdb::command::go(&args);
+        }
+        Commands::Embedding(args) => {
+            embedding::command::go(&args);
         }
     }
 }

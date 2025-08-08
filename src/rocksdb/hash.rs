@@ -14,7 +14,7 @@
 //!
 //! For Node instances, you can use the `name_hash()` method:
 //!
-//! ```
+//! ```ignore
 //! let node = Node { /* ... */ };
 //! let hash = node.name_hash();
 //! ```
